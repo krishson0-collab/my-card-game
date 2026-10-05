@@ -1,0 +1,684 @@
+const socket = io();
+
+let MY_ID = null;
+let MY_NAME = "";
+let ROOM_ID = null;
+let CURRENT_PHASE = "warmup";
+let MY_VOTED_RESTART = false;
+let PLAYER_NAMES = {};
+let BID_WINNER_ID = null;
+
+const $ = id => document.getElementById(id);
+const show = el => el.classList.remove("hidden");
+const hide = el => el.classList.add("hidden");
+
+const RIGHT_HAND_ORDER = [1, 4, 2, 3];
+const TEAMMATES = { 1: 2, 2: 1, 3: 4, 4: 3 };
+
+function getPlayerName(pid) {
+    if (pid === MY_ID) return "You";
+    return PLAYER_NAMES[pid] || `P${pid}`;
+}
+
+function getSeatPosition(playerId) {
+    if (playerId === MY_ID) return "bottom";
+    if (playerId === TEAMMATES[MY_ID]) return "top";
+
+    const myIdx = RIGHT_HAND_ORDER.indexOf(MY_ID);
+    const rightPlayer = RIGHT_HAND_ORDER[(myIdx + 1) % 4];
+    const leftPlayer = RIGHT_HAND_ORDER[(myIdx + 3) % 4];
+
+    if (playerId === rightPlayer) return "right";
+    if (playerId === leftPlayer) return "left";
+    return null;
+}
+
+// ======================================================
+// SOUND TOGGLE
+// ======================================================
+$("sound-fab").onclick = () => {
+    Sound.init();
+    Sound.enabled = !Sound.enabled;
+    const btn = $("sound-fab");
+    btn.classList.toggle("muted", !Sound.enabled);
+    btn.textContent = Sound.enabled ? "🔊" : "🔇";
+    if (Sound.enabled) Sound.bid();
+};
+
+// ======================================================
+// LOBBY — JOIN with password
+// ======================================================
+$("join-btn").onclick = () => {
+    const name = $("player-name").value.trim() || "Player";
+    const room = $("room-id").value.trim().toLowerCase();
+    const password = $("room-password").value.trim();
+    if (!room) return ($("lobby-msg").textContent = "Room code daalo");
+    ROOM_ID = room;
+    MY_NAME = name;
+    socket.emit("joinRoom", { roomId: room, playerName: name, password: password });
+};
+
+socket.on("joinError", msg => {
+    $("lobby-msg").textContent = "❌ " + msg;
+    Sound.error();
+});
+
+socket.on("joined", data => {
+    MY_ID = data.playerId;
+    ROOM_ID = data.roomId;
+    hide($("lobby"));
+    show($("game"));
+    $("room-display").textContent = ROOM_ID;
+});
+
+socket.on("roomUpdate", data => {
+    data.players.forEach(p => { PLAYER_NAMES[p.id] = p.name; });
+    const list = $("players-list");
+    list.innerHTML = "<h3>Players:</h3>";
+    data.players.forEach(p => {
+        const d = document.createElement("div");
+        d.textContent = `${p.name} (P${p.id}) — ${p.connected ? "✅" : "❌"}`;
+        list.appendChild(d);
+    });
+    refreshAllSeats();
+});
+
+socket.on("errorMsg", msg => {
+    showMsg("❌ " + msg);
+    Sound.error();
+    vibrate(80);
+});
+
+// ======================================================
+// RESET VOTING
+// ======================================================
+$("vote-reset-btn").onclick = () => {
+    Sound.bid();
+    vibrate(30);
+    socket.emit("voteRestart");
+};
+
+socket.on("restartVotesUpdate", data => {
+    $("reset-vote-info").textContent = `${data.total}/4`;
+    MY_VOTED_RESTART = data.votes.includes(MY_ID);
+    const btn = $("vote-reset-btn");
+    btn.classList.toggle("voted", MY_VOTED_RESTART);
+    btn.textContent = MY_VOTED_RESTART ? "✅ Voted" : "🔄 Reset";
+});
+
+socket.on("gameRestarted", () => {
+    MY_VOTED_RESTART = false;
+    $("vote-reset-btn").classList.remove("voted");
+    $("vote-reset-btn").textContent = "🔄 Reset";
+    $("reset-vote-info").textContent = "0/4";
+});
+
+// ======================================================
+// LEAVE ROOM
+// ======================================================
+$("leave-fab").onclick = () => {
+    Sound.pass();
+    vibrate(50);
+    show($("leave-confirm-panel"));
+};
+
+$("leave-confirm-no").onclick = () => {
+    hide($("leave-confirm-panel"));
+};
+
+$("leave-confirm-yes").onclick = () => {
+    Sound.pass();
+    vibrate(100);
+    socket.emit("leaveRoom");
+    hide($("leave-confirm-panel"));
+    hide($("game"));
+    show($("lobby"));
+    $("lobby-msg").textContent = "✅ Room chhod diya. Naya room join kar sakte ho.";
+    $("lobby-msg").style.color = "#2ecc71";
+    MY_ID = null;
+    ROOM_ID = null;
+    PLAYER_NAMES = {};
+    BID_WINNER_ID = null;
+    $("players-list").innerHTML = "";
+    $("room-id").value = "";
+    $("room-password").value = "";
+};
+
+socket.on("playerLeft", data => {
+    showMsg(`👋 ${data.playerName} ne room chhod diya`);
+    Sound.pass();
+});
+
+// ======================================================
+// HISTORY SLIDE PANEL
+// ======================================================
+$("history-fab").onclick = () => {
+    Sound.bid();
+    show($("history-overlay"));
+    show($("history-panel"));
+};
+
+function closeHistoryPanel() {
+    hide($("history-overlay"));
+    hide($("history-panel"));
+}
+
+$("close-history-btn").onclick = closeHistoryPanel;
+$("history-overlay").onclick = closeHistoryPanel;
+
+// ======================================================
+// GAME START
+// ======================================================
+socket.on("gameStart", data => {
+    MY_ID = data.yourId;
+    CURRENT_PHASE = data.phase;
+    data.players.forEach(p => { PLAYER_NAMES[p.id] = p.name; });
+
+    BID_WINNER_ID = null;
+
+    refreshAllSeats();
+    updatePhaseUI(data.phase);
+    renderHand(data.yourHand);
+    updatePlayerStats(data.players.map(p => ({ ...p, tricks: 0 })));
+    resetAllTricks();
+    renderBidHistory(data.bidHistory);
+    $("trump-display").textContent = "-";
+    $("trump-chooser-name").textContent = "";
+    $("team-a-score").textContent = data.teamAScore || 0;
+    $("team-b-score").textContent = data.teamBScore || 0;
+
+    clearAllSlots();
+    hide($("teammate-cards"));
+    $("teammate-cards-list").innerHTML = "";
+    clearActiveLeader();
+    clearBidWinner();
+
+    showMsg(data.phase === "warmup"
+        ? "🔥 WARMUP — 5 cards"
+        : "🃏 MAIN ROUND — 13 cards");
+
+    Sound.deal();
+    vibrate(50);
+
+    enableBidButtons(false);
+});
+
+function refreshAllSeats() {
+    ["top", "left", "right", "bottom"].forEach(pos => {
+        const nameEl = $(`${pos}-name`);
+        if (nameEl) {
+            for (let pid = 1; pid <= 4; pid++) {
+                if (getSeatPosition(pid) === pos) {
+                    let n = PLAYER_NAMES[pid] || `P${pid}`;
+                    if (pid === MY_ID) n = `${n} (You)`;
+                    nameEl.textContent = n;
+                    break;
+                }
+            }
+        }
+    });
+}
+
+function updatePhaseUI(phase) {
+    $("phase-display").textContent = phase === "warmup" ? "WARMUP" : "MAIN";
+    if (phase === "warmup") {
+        show($("warmup-bid-buttons"));
+        hide($("main-bid-buttons"));
+    } else {
+        hide($("warmup-bid-buttons"));
+        show($("main-bid-buttons"));
+    }
+}
+
+// ======================================================
+// BIDDING
+// ======================================================
+document.querySelectorAll(".bid-button, .bid-button-warmup").forEach(b => {
+    b.onclick = () => {
+        if (b.disabled) return;
+        Sound.bid();
+        vibrate(30);
+        socket.emit("bid", { bid: Number(b.dataset.bid) });
+    };
+});
+
+$("pass-button").onclick = () => {
+    if ($("pass-button").disabled) return;
+    Sound.pass();
+    vibrate(50);
+    socket.emit("pass");
+};
+
+$("pass-button-main").onclick = () => {
+    if ($("pass-button-main").disabled) return;
+    Sound.pass();
+    vibrate(50);
+    socket.emit("pass");
+};
+
+socket.on("bidUpdate", data => {
+    CURRENT_PHASE = data.phase;
+    updatePhaseUI(data.phase);
+    renderBidHistory(data.bidHistory);
+
+    if (data.biddingActive) {
+        if (data.nextBidderId === MY_ID) {
+            $("bid-turn-info").textContent = "🎯 Tumhari baari";
+            enableBidButtons(true);
+            Sound.yourTurn();
+            vibrate([100, 50, 100]);
+        } else {
+            $("bid-turn-info").textContent = `⏳ ${getPlayerName(data.nextBidderId)}`;
+            enableBidButtons(false);
+        }
+        setActivePlayer(data.nextBidderId);
+    } else {
+        enableBidButtons(false);
+        $("bid-turn-info").textContent = "";
+        clearActivePlayer();
+    }
+});
+
+function enableBidButtons(on) {
+    document.querySelectorAll(".bid-button").forEach(b => b.disabled = !on);
+    document.querySelectorAll(".bid-button-warmup").forEach(b => b.disabled = !on);
+    $("pass-button").disabled = !on;
+    $("pass-button-main").disabled = !on;
+}
+
+socket.on("biddingFinished", data => {
+    showMsg(`👑 ${data.highestBidderName} — ${data.highestBid}`);
+    BID_WINNER_ID = data.highestBidderId;
+    setBidWinner(data.highestBidderId);
+    if (data.highestBidderId === MY_ID) show($("trump-panel"));
+});
+
+socket.on("warmupSkipped", () => showMsg("⏭️ Sab pass — main round!"));
+
+// ======================================================
+// TRUMP
+// ======================================================
+document.querySelectorAll("#trump-buttons button").forEach(b => {
+    b.onclick = () => {
+        Sound.bid();
+        vibrate(30);
+        socket.emit("chooseTrump", { suit: b.dataset.suit });
+        hide($("trump-panel"));
+    };
+});
+
+socket.on("trumpSet", data => {
+    $("trump-display").textContent = data.trumpSuit;
+    const chooserName = data.highestBidderName || getPlayerName(data.highestBidderId);
+    if (chooserName) $("trump-chooser-name").textContent = `(${chooserName})`;
+    showMsg(`👑 Trump: ${data.trumpSuit} — ${chooserName}`);
+    if (data.waitReveal && data.highestBidderId === MY_ID) show($("reveal-panel"));
+});
+
+// ======================================================
+// REVEAL
+// ======================================================
+$("reveal-yes").onclick = () => {
+    Sound.bid();
+    socket.emit("revealDecision", { decision: "show" });
+    hide($("reveal-panel"));
+};
+$("reveal-no").onclick = () => {
+    Sound.pass();
+    socket.emit("revealDecision", { decision: "hide" });
+    hide($("reveal-panel"));
+};
+
+socket.on("teammateRevealed", data => {
+    showMsg(data.revealed ? "👀 Partner ke cards khul gaye" : "🔒 Partner chhupe rahenge");
+});
+
+// ======================================================
+// ROUND START
+// ======================================================
+socket.on("roundStarted", data => {
+    CURRENT_PHASE = data.phase;
+    updatePhaseUI(data.phase);
+    renderHand(data.yourHand);
+    $("trump-display").textContent = data.trumpSuit;
+    updatePlayerStats(data.handSizes);
+    resetAllTricks();
+    clearAllSlots();
+
+    if (data.revealedHand && data.revealedHand.length > 0) {
+        renderTeammateCards(data.revealedHand, data.revealedOwnerId);
+    } else {
+        hide($("teammate-cards"));
+    }
+
+    // Bid winner crown
+    if (data.bidWinnerId) {
+        BID_WINNER_ID = data.bidWinnerId;
+        setBidWinner(data.bidWinnerId);
+    }
+
+    if (data.currentPlayerId === MY_ID) {
+        Sound.yourTurn();
+        vibrate([100, 50, 100]);
+    }
+
+    setActivePlayer(data.currentPlayerId);
+    setTrickLeader(data.leadPlayerId || data.currentPlayerId);
+
+    const table = $("table");
+    if (table) {
+        table.classList.remove("flash-turn");
+        void table.offsetWidth;
+        table.classList.add("flash-turn");
+    }
+
+    showMsg(data.currentPlayerId === MY_ID
+        ? "🎯 Tumhari baari"
+        : `⏳ ${getPlayerName(data.currentPlayerId)} ki baari`);
+});
+
+// ======================================================
+// CARD RENDERING — Real card design
+// ======================================================
+function createCardEl(card, isPlayable = false) {
+    const d = document.createElement("div");
+    d.className = "card";
+    const isRed = card.suit === "♥️" || card.suit === "♦️";
+    if (isRed) d.classList.add("red");
+    else d.classList.add("black");
+
+    // Top-left corner
+    const tl = document.createElement("div");
+    tl.className = "corner tl";
+    tl.innerHTML = `<span class="rank">${card.rank}</span><span class="suit">${card.suit}</span>`;
+
+    // Bottom-right corner (rotated)
+    const br = document.createElement("div");
+    br.className = "corner br";
+    br.innerHTML = `<span class="rank">${card.rank}</span><span class="suit">${card.suit}</span>`;
+
+    // Center big suit
+    const center = document.createElement("div");
+    center.className = "center-suit";
+    center.textContent = card.suit;
+
+    d.appendChild(tl);
+    d.appendChild(center);
+    d.appendChild(br);
+
+    if (isPlayable) d.classList.add("playable");
+    return d;
+}
+
+function renderHand(hand) {
+    const c = $("player1-cards");
+    c.innerHTML = "";
+    hand.forEach((card, i) => {
+        const d = createCardEl(card);
+        d.onclick = () => {
+            Sound.cardPlay();
+            vibrate(20);
+            socket.emit("playCard", { cardIndex: i });
+        };
+        c.appendChild(d);
+    });
+}
+
+socket.on("handUpdate", data => renderHand(data.hand));
+
+// ======================================================
+// PLAYED CARDS
+// ======================================================
+socket.on("cardPlayed", data => {
+    renderPlayedCards(data.trickCards);
+    Sound.cardPlay();
+    const displayName = data.playerName || getPlayerName(data.playerId);
+    showMsg(`${displayName} → ${data.card.rank}${data.card.suit}`);
+
+    if (data.nextPlayerId) {
+        setActivePlayer(data.nextPlayerId);
+        if (data.nextPlayerId === MY_ID) {
+            setTimeout(() => {
+                Sound.yourTurn();
+                vibrate([100, 50, 100]);
+            }, 400);
+        }
+    } else {
+        clearActivePlayer();
+    }
+
+    if (data.leadPlayerId) setTrickLeader(data.leadPlayerId);
+});
+
+function renderPlayedCards(trickCards) {
+    clearAllSlots();
+    trickCards.forEach(item => {
+        const pid = item.playerIndex + 1;
+        const pos = getSeatPosition(pid);
+        if (!pos) return;
+        const slot = $(`slot-${pos}`);
+        if (!slot) return;
+        const cardEl = createCardEl(item.card);
+        slot.appendChild(cardEl);
+    });
+}
+
+function clearAllSlots() {
+    ["top", "left", "right", "bottom"].forEach(pos => {
+        const slot = $(`slot-${pos}`);
+        if (slot) slot.innerHTML = "";
+    });
+}
+
+// ======================================================
+// TEAMMATE REVEALED CARDS
+// ======================================================
+socket.on("revealedHandUpdate", data => renderTeammateCards(data.revealedHand, data.revealedOwnerId));
+
+function renderTeammateCards(hand, ownerId) {
+    show($("teammate-cards"));
+    $("revealed-owner").textContent = `${PLAYER_NAMES[ownerId] || "P" + ownerId}`;
+    const c = $("teammate-cards-list");
+    c.innerHTML = "";
+    hand.forEach(card => c.appendChild(createCardEl(card)));
+}
+
+// ======================================================
+// TRICK RESOLVED
+// ======================================================
+socket.on("trickResolved", data => {
+    if (data.warmupFailed) {
+        showMsg(`💥 Warmup khatam — bidder ki team haar gayi!`);
+    } else {
+        showMsg(`🏆 ${getPlayerName(data.winnerId)} ne trick ${data.trickNumber} jeeti`);
+    }
+
+    if (data.winnerId === MY_ID) {
+        Sound.trickWin();
+        vibrate([50, 30, 50, 30, 100]);
+    }
+
+    setTimeout(() => clearAllSlots(), 1200);
+    updatePlayerStats(data.players);
+
+    setActivePlayer(data.nextPlayerId);
+    setTrickLeader(data.leadPlayerId || data.nextPlayerId);
+});
+
+// ======================================================
+// ROUND END
+// ======================================================
+socket.on("roundEnd", result => {
+    $("team-a-score").textContent = result.teamAScore;
+    $("team-b-score").textContent = result.teamBScore;
+
+    let summary;
+    if (result.phase === "warmup") {
+        if (result.success) {
+            summary = `🔥 WARMUP: Team ${result.bidderTeam} ne 5/5 liye → Team ${result.bonusTeam} +26`;
+            showMsg(`🏁 WARMUP WIN — Team ${result.bonusTeam} +26`);
+        } else {
+            summary = `💥 WARMUP: Team ${result.bidderTeam} fail → -26`;
+            showMsg(`🏁 WARMUP FAIL — Team ${result.bidderTeam} -26`);
+        }
+    } else {
+        const sign = result.sar >= 0 ? "+" : "";
+        summary = `🎴 MAIN: Team ${result.team} bid ${result.bid}, ${result.tricks} tricks → ${sign}${result.sar}`;
+        showMsg(`🏁 Round — Team ${result.team}: ${result.tricks} tricks, SAR ${sign}${result.sar}`);
+    }
+    addRoundHistory(summary, result.teamAScore, result.teamBScore);
+});
+
+function addRoundHistory(text, aScore, bScore) {
+    const c = $("round-history-list");
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.innerHTML = `<div class="history-text">${text}</div>
+                     <div class="history-scores">A: ${aScore} | B: ${bScore}</div>`;
+    c.appendChild(div);
+    c.scrollTop = c.scrollHeight;
+}
+
+// ======================================================
+// GAME OVER
+// ======================================================
+socket.on("gameOver", data => {
+    const winnerName = data.winner === "A" ? "Team A" : "Team B";
+    $("winner-team").textContent = `🎉 ${winnerName} Wins!`;
+    $("final-team-a").textContent = data.teamAScore + " SAR";
+    $("final-team-b").textContent = data.teamBScore + " SAR";
+    $("final-row-a").classList.toggle("winner", data.winner === "A");
+    $("final-row-b").classList.toggle("winner", data.winner === "B");
+    $("result-message").textContent = `Team ${data.winner} ne 52 SAR cross kiye!`;
+    show($("game-over-panel"));
+
+    const myTeam = (MY_ID === 1 || MY_ID === 2) ? "A" : "B";
+    if (data.winner === myTeam) {
+        Sound.gameWin();
+        launchConfetti();
+        vibrate([200, 100, 200, 100, 400]);
+    } else {
+        Sound.gameLose();
+        vibrate(500);
+    }
+});
+
+$("close-result-btn").onclick = () => hide($("game-over-panel"));
+
+// ======================================================
+// PLAYER BOX STATE
+// ======================================================
+function getBoxByPlayerId(pid) {
+    const pos = getSeatPosition(pid);
+    if (!pos) return null;
+    return $(`seat-${pos}`).querySelector(".player-box");
+}
+
+function setActivePlayer(pid) {
+    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("active"));
+    if (!pid) return;
+    const box = getBoxByPlayerId(pid);
+    if (box) box.classList.add("active");
+}
+
+function clearActivePlayer() {
+    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("active"));
+}
+
+function setTrickLeader(pid) {
+    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("leader"));
+    if (!pid) return;
+    const box = getBoxByPlayerId(pid);
+    if (box) box.classList.add("leader");
+}
+
+function clearActiveLeader() {
+    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("leader", "active"));
+}
+
+// 👑 Bid winner crown
+function setBidWinner(pid) {
+    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("bid-winner"));
+    if (!pid) return;
+    const box = getBoxByPlayerId(pid);
+    if (box) box.classList.add("bid-winner");
+}
+
+function clearBidWinner() {
+    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("bid-winner"));
+}
+
+// ======================================================
+// STATS
+// ======================================================
+function updatePlayerStats(players) {
+    players.forEach(p => {
+        const pos = getSeatPosition(p.id);
+        if (!pos) return;
+
+        const countEl = $(`${pos}-count`);
+        if (countEl) {
+            const size = p.handSize !== undefined ? p.handSize : p.size;
+            if (size !== undefined) countEl.textContent = size;
+        }
+
+        const tricksEl = $(`${pos}-tricks`);
+        if (tricksEl && p.tricks !== undefined) {
+            tricksEl.textContent = p.tricks;
+        }
+    });
+}
+
+function resetAllTricks() {
+    ["top", "left", "right", "bottom"].forEach(pos => {
+        const el = $(`${pos}-tricks`);
+        if (el) el.textContent = "0";
+    });
+}
+
+// ======================================================
+// BID HISTORY
+// ======================================================
+function renderBidHistory(history) {
+    const c = $("bid-history-list");
+    if (!c) return;
+    c.innerHTML = "";
+
+    if (!history || history.length === 0) {
+        c.innerHTML = '<div class="bid-empty">No bids yet...</div>';
+        return;
+    }
+
+    history.forEach(item => {
+        const d = document.createElement("div");
+        d.className = "bid-item";
+
+        const parts = item.split(" → ");
+        const player = parts[0] || "?";
+        const action = parts[1] || "";
+
+        if (action.includes("PASS")) {
+            d.classList.add("pass");
+            if (action.includes("auto")) d.classList.add("auto-pass");
+        } else if (action.includes("Bid")) {
+            d.classList.add("bid");
+        }
+
+        const ps = document.createElement("span");
+        ps.className = "bid-player";
+        ps.textContent = player;
+
+        const as = document.createElement("span");
+        as.className = "bid-value";
+        as.textContent = action.replace("(auto)", "").replace("⚠️", "").trim();
+
+        d.appendChild(ps);
+        d.appendChild(as);
+        c.appendChild(d);
+    });
+    c.scrollTop = c.scrollHeight;
+}
+
+function showMsg(msg) {
+    $("game-message").textContent = msg;
+}
