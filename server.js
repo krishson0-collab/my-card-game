@@ -337,7 +337,7 @@ function beats(room, challenger, current) {
 // ======================================================
 // ROUND END
 // ======================================================
-function finishWarmup(room) {
+function finish(room) {
     room.roundStarted = false;
     const bidderTeam = room.players[room.highestBidder].team;
     let tricksWon = 0;
@@ -378,60 +378,110 @@ function finishMain(room) {
 }
 
 // ======================================================
-// BROADCAST
+// BROADCAST (with safety checks)
 // ======================================================
 function sendGameStart(room) {
+    if (!room || !room.players) return;
     room.players.forEach(p => {
-        io.to(p.socketId).emit("gameStart", {
-            yourId: p.id, yourHand: p.hand, phase: room.phase,
-            players: room.players.map(pl => ({ id: pl.id, name: pl.name, team: pl.team, handSize: pl.hand.length, tricks: pl.tricks })),
-            currentBid: room.currentBid,
-            currentBidderId: room.players[getCurrentBidderIndex(room)].id,
-            bidHistory: room.bidHistory,
-            teamAScore: room.teamAScore, teamBScore: room.teamBScore
-        });
+        if (!p || !p.socketId || !p.connected) return;
+        try {
+            io.to(p.socketId).emit("gameStart", {
+                yourId: p.id, yourHand: p.hand, phase: room.phase,
+                players: room.players.map(pl => ({ id: pl.id, name: pl.name, team: pl.team, handSize: pl.hand.length, tricks: pl.tricks })),
+                currentBid: room.currentBid,
+                currentBidderId: room.players[getCurrentBidderIndex(room)].id,
+                bidHistory: room.bidHistory,
+                teamAScore: room.teamAScore, teamBScore: room.teamBScore
+            });
+        } catch (e) {
+            console.error("Error in sendGameStart:", e.message);
+        }
     });
 }
 
 function sendBidUpdate(room) {
-    io.to(room.id).emit("bidUpdate", {
-        currentBid: room.currentBid, highestBid: room.highestBid,
-        highestBidderId: room.highestBidder !== null ? room.players[room.highestBidder].id : null,
-        bidHistory: room.bidHistory,
-        nextBidderId: room.biddingActive ? room.players[getCurrentBidderIndex(room)].id : null,
-        biddingActive: room.biddingActive, phase: room.phase
-    });
+    if (!room) return;
+    try {
+        io.to(room.id).emit("bidUpdate", {
+            currentBid: room.currentBid, highestBid: room.highestBid,
+            highestBidderId: room.highestBidder !== null && room.players[room.highestBidder] ? room.players[room.highestBidder].id : null,
+            bidHistory: room.bidHistory,
+            nextBidderId: room.biddingActive ? room.players[getCurrentBidderIndex(room)].id : null,
+            biddingActive: room.biddingActive, phase: room.phase
+        });
+    } catch (e) {
+        console.error("Error in sendBidUpdate:", e.message);
+    }
 }
 
 function broadcastRoundStart(room) {
+    if (!room || !room.players) return;
+
     let revealedHand = null, revealedOwnerId = null;
-    if (room.teammateRevealed && room.highestBidder !== null) {
-        const bidderId = room.players[room.highestBidder].id;
-        const mateId = TEAMMATES[bidderId];
-        revealedHand = room.players[mateId - 1].hand;
-        revealedOwnerId = mateId;
+
+    try {
+        if (
+            room.teammateRevealed &&
+            room.highestBidder !== null &&
+            room.highestBidder !== undefined &&
+            room.players[room.highestBidder]
+        ) {
+            const bidderId = room.players[room.highestBidder].id;
+            const mateId = TEAMMATES[bidderId];
+            if (mateId && room.players[mateId - 1]) {
+                revealedHand = room.players[mateId - 1].hand;
+                revealedOwnerId = mateId;
+            }
+        }
+    } catch (e) {
+        console.error("Error in broadcastRoundStart (reveal):", e.message);
     }
-    const bidWinnerId = room.highestBidder !== null ? room.players[room.highestBidder].id : null;
+
+    const bidWinnerId =
+        room.highestBidder !== null &&
+        room.highestBidder !== undefined &&
+        room.players[room.highestBidder]
+            ? room.players[room.highestBidder].id
+            : null;
 
     room.players.forEach(p => {
-        io.to(p.socketId).emit("roundStarted", {
-            yourId: p.id, yourHand: p.hand, phase: room.phase,
-            trumpSuit: room.trumpSuit,
-            currentPlayerId: room.players[room.currentPlayerIndex].id,
-            leadPlayerId: room.players[room.currentPlayerIndex].id,
-            handSizes: room.players.map(pl => ({ id: pl.id, size: pl.hand.length, tricks: pl.tricks })),
-            revealedHand, revealedOwnerId,
-            bidWinnerId,
-            totalTricks: room.phase === PHASE_WARMUP ? WARMUP_TRICKS : MAIN_TRICKS
-        });
+        if (!p || !p.socketId || !p.connected) return;
+        try {
+            io.to(p.socketId).emit("roundStarted", {
+                yourId: p.id, yourHand: p.hand, phase: room.phase,
+                trumpSuit: room.trumpSuit,
+                currentPlayerId: room.players[room.currentPlayerIndex].id,
+                leadPlayerId: room.players[room.currentPlayerIndex].id,
+                handSizes: room.players.map(pl => ({ id: pl.id, size: pl.hand.length, tricks: pl.tricks })),
+                revealedHand, revealedOwnerId,
+                bidWinnerId,
+                totalTricks: room.phase === PHASE_WARMUP ? WARMUP_TRICKS : MAIN_TRICKS
+            });
+        } catch (e) {
+            console.error("Error in broadcastRoundStart (emit):", e.message);
+        }
     });
 }
 
 function broadcastRevealedHandUpdate(room) {
-    if (!room.teamm.highestBidder === null) return;
+    if (!room) return;
+    if (!room.teammateRevealed) return;
+    if (room.highestBidder === null || room.highestBidder === undefined) return;
+    if (!room.players || !room.players[room.highestBidder]) return;
+
     const bidderId = room.players[room.highestBidder].id;
     const mateId = TEAMMATES[bidderId];
-    io.to(room.id).emit("revealedHandUpdate", { revealedHand: room.players[mateId - 1].hand, revealedOwnerId: mateId });
+    if (!mateId) return;
+    if (!room.players[mateId - 1]) return;
+
+    try {
+        io.to(room.id).emit("revealedHandUpdate", {
+            revealedHand: room.players[mateId - 1].hand,
+            revealedOwnerId: mateId
+        });
+    } catch (e) {
+        console.error("Error in broadcastRevealedHandUpdate:", e.message);
+    }
 }
 
 // ======================================================
@@ -547,11 +597,24 @@ io.on("connection", socket => {
         const pid = socket.data.playerId;
         const res = handlePlayCard(room, pid, cardIndex);
         if (res.error) return socket.emit("errorMsg", res.error);
-        io.to(room.players[pid - 1].socketId).emit("handUpdate", { hand: room.players[pid - 1].hand });
-        if (room.teammateRevealed && room.highestBidder !== null) {
-            const mateId = TEAMMATES[room.players[room.highestBidder].id];
-            if (pid === mateId) broadcastRevealedHandUpdate(room);
+
+        // Send updated hand to the player who played (with safety check)
+        const pidPlayer = room.players[pid - 1];
+        if (pidPlayer && pidPlayer.socketId) {
+            io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
         }
+
+        // Revealed teammate hand update (with safety checks)
+        if (
+            room.teammateRevealed &&
+            room.highestBidder !== null &&
+            room.highestBidder !== undefined &&
+            room.players[room.highestBidder]
+        ) {
+            const mateId = TEAMMATES[room.players[room.highestBidder].id];
+            if (mateId && pid === mateId) broadcastRevealedHandUpdate(room);
+        }
+
         io.to(room.id).emit("cardPlayed", {
             playerId: pid,
             playerName: room.players[pid - 1].name,
@@ -560,6 +623,7 @@ io.on("connection", socket => {
             nextPlayerId: room.trickCards.length < 4 ? room.players[room.currentPlayerIndex].id : null,
             leadPlayerId: room.trickCards[0].playerIndex + 1
         });
+
         if (res.resolveTrick) {
             setTimeout(() => {
                 const r = resolveTrick(room);
