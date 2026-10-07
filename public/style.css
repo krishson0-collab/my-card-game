@@ -407,7 +407,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 }
 
 /* ======================================================
-   TEAMMATE CARDS — POORE DIKHEIN (wrap + chhote)
+   TEAMMATE CARDS — POORE DIKHEIN
    ====================================================== */
 #teammate-cards {
     margin: 0 0 6px 0;
@@ -443,7 +443,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     gap: 1px;
     justify-content: center;
     align-items: center;
-    flex-wrap: wrap;              /* ✅ wrap — sab dikhenge */
+    flex-wrap: wrap;
     overflow: visible;
 }
 #teammate-cards-list .card {
@@ -459,13 +459,13 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #teammate-cards-list .card .c-suit { font-size: 12px; }
 
 /* ======================================================
-   BID UI — FLOATING
+   BID UI — TOP (always visible)
    ====================================================== */
 #bid-ui {
     position: fixed !important;
-    bottom: calc(180px + env(safe-area-inset-bottom, 0)) !important;
+    top: calc(70px + env(safe-area-inset-top, 0)) !important;
+    bottom: auto !important;
     left: 50% !important;
-    top: auto !important;
     transform: translateX(-50%) !important;
     display: none !important;
     flex-direction: column !important;
@@ -484,8 +484,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     animation: bidPop 0.3s ease-out;
 }
 @keyframes bidPop {
-    from { transform: translateX(-50%) translateY(20px); opacity: 0; }
-    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    from { transform: translateX(-50%) scale(0.85); opacity: 0; }
+    to { transform: translateX(-50%) scale(1); opacity: 1; }
 }
 #bid-turn-info {
     color: #8b2538; font-weight: 900; font-size: 13px;
@@ -673,7 +673,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     #trump-name-small { font-size: 9px; max-width: 50px; }
     .logo-icon-big { font-size: 44px; }
     .game-title { font-size: 26px; }
-    #bid-ui { bottom: calc(160px + env(safe-area-inset-bottom, 0)) !important; padding: 10px 12px; }
+    #bid-ui { top: calc(60px + env(safe-area-inset-top, 0)) !important; padding: 10px 12px; }
     #my-area { padding-top: 12px; }
     #player1-cards { min-height: 90px; }
     #teammate-cards-list .card {
@@ -697,7 +697,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     .my-avatar-inner, .my-avatar-wrap { width: 40px; height: 40px; }
     .icon-btn { width: 36px; height: 36px; }
     #player1-cards { min-height: 70px; }
-    #bid-ui { bottom: calc(100px + env(safe-area-inset-bottom, 0)) !important; padding: 8px 12px; gap: 4px; }
+    #bid-ui { top: calc(55px + env(safe-area-inset-top, 0)) !important; padding: 8px 12px; gap: 4px; }
     #bid-turn-info { font-size: 11px; padding: 3px 8px; }
     #bid-ui button { padding: 6px 8px; font-size: 12px; min-width: 34px; min-height: 32px; }
     #my-area { padding-top: 6px; }
