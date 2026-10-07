@@ -52,8 +52,8 @@ function openLobbyForm(mode) {
     const roomCodeGroup = $("room-code-group");
     const roomPassGroup = $("room-pass-group");
 
-    SET roomCodeGroup.classList.remove("hidden");
- —    roomPass BGroup.classList.remove("hidden");
+    roomCodeGroup.classList.remove("hidden");
+    roomPassGroup.classList.remove("hidden");
 
     if (mode === "bot") {
         title.textContent = "🤖 Practice Mode";
