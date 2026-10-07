@@ -137,6 +137,20 @@ function dealMainFromWarmup(room) {
     resetRoundState(room, MAIN_START_BID);
 }
 
+function dealMainFresh(room) {
+    const deck = shuffle(createDeck());
+    room.phase = PHASE_MAIN;
+    room.players.forEach(p => { p.hand = []; p.tricks = 0; });
+    let idx = 0;
+    for (let c = 0; c < 13; c++) {
+        for (let p = 0; p < 4; p++) {
+            room.players[p].hand.push(deck[idx++]);
+        }
+    }
+    room.players.forEach(p => { p.hand = sortHand(p.hand); });
+    resetRoundState(room, MAIN_START_BID);
+}
+
 function resetRoundState(room, startingBid) {
     room.currentBid = startingBid;
     room.highestBid = startingBid;
@@ -700,7 +714,7 @@ io.on("connection", socket => {
     });
 
     // ======================================================
-    // START BOT GAME
+    // START BOT GAME — DIRECT 13 CARDS (no warmup)
     // ======================================================
     socket.on("startBotGame", ({ roomId, playerName }) => {
         console.log(`🤖 Bot game request: room=${roomId}, name=${playerName}`);
@@ -738,11 +752,12 @@ io.on("connection", socket => {
             }))
         });
 
-        dealWarmup(room);
+        // ✅ DIRECT 13 CARDS (no warmup)
+        dealMainFresh(room);
         sendGameStart(room);
         sendBidUpdate(room);
 
-        console.log(`✅ Bot game started in room ${roomId}`);
+        console.log(`✅ Bot game started (13 cards) in room ${roomId}`);
 
         setTimeout(() => scheduleBotAction(room), 800);
     });
