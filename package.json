@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/package.json",
   "name": "card-game-online",
   "version": "1.0.0",
   "main": "server.js",

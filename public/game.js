@@ -7,6 +7,7 @@ let CURRENT_PHASE = "warmup";
 let MY_VOTED_RESTART = false;
 let PLAYER_NAMES = {};
 let BID_WINNER_ID = null;
+let CURRENT_MODE = "online";
 
 const $ = id => document.getElementById(id);
 const show = el => el.classList.remove("hidden");
@@ -33,7 +34,7 @@ function getSeatPosition(playerId) {
     return null;
 }
 
-// SOUND TOGGLE
+// SOUND
 $("sound-fab").onclick = () => {
     Sound.init();
     Sound.enabled = !Sound.enabled;
@@ -43,17 +44,87 @@ $("sound-fab").onclick = () => {
     if (Sound.enabled) Sound.bid();
 };
 
-// LOBBY
+// ======================================================
+// LOBBY MODES
+// ======================================================
+function openLobbyForm(mode) {
+    CURRENT_MODE = mode;
+    const form = $("lobby-form");
+    const title = $("form-title");
+    const roomCodeGroup = $("room-code-group");
+    const roomPassGroup = $("room-pass-group");
+
+    roomCodeGroup.classList.remove("hidden");
+    roomPassGroup.classList.remove("hidden");
+
+    if (mode === "bot") {
+        title.textContent = "🤖 Practice Mode";
+        roomCodeGroup.classList.add("hidden");
+        roomPassGroup.classList.add("hidden");
+    } else if (mode === "online") {
+        title.textContent = "🌐 Play Online";
+        roomPassGroup.classList.add("hidden");
+    } else if (mode === "private") {
+        title.textContent = "🔒 Private Room";
+    } else if (mode === "local") {
+        title.textContent = "📱 Play Locally";
+    }
+
+    $("lobby-msg").textContent = "";
+    show(form);
+}
+
+$("bot-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("bot"); };
+$("online-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("online"); };
+$("private-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("private"); };
+$("local-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("local"); };
+
+$("form-back").onclick = () => {
+    Sound.pass();
+    hide($("lobby-form"));
+};
+
+// JOIN BUTTON
 $("join-btn").onclick = () => {
     const name = $("player-name").value.trim() || "Player";
     const room = $("room-id").value.trim().toLowerCase();
     const password = $("room-password").value.trim();
+
+    $("profile-name-display").textContent = name;
+    localStorage.setItem("playerName", name);
+
+    if (CURRENT_MODE === "bot") {
+        const botRoom = "bot_" + Date.now();
+        Sound.bid();
+        vibrate(30);
+        socket.emit("startBotGame", { roomId: botRoom, playerName: name });
+        return;
+    }
+
     if (!room) return ($("lobby-msg").textContent = "Room code daalo");
+
+    if (CURRENT_MODE === "private" && !password) {
+        return ($("lobby-msg").textContent = "Password daalo");
+    }
+
     ROOM_ID = room;
     MY_NAME = name;
-    socket.emit("joinRoom", { roomId: room, playerName: name, password: password });
+    socket.emit("joinRoom", {
+        roomId: room,
+        playerName: name,
+        password: password
+    });
 };
 
+// LOAD SAVED NAME
+const savedName = localStorage.getItem("playerName");
+if (savedName) {
+    $("profile-name-display").textContent = savedName;
+}
+
+// ======================================================
+// SOCKET EVENTS
+// ======================================================
 socket.on("joinError", msg => {
     $("lobby-msg").textContent = "❌ " + msg;
     Sound.error();
@@ -97,17 +168,14 @@ socket.on("restartVotesUpdate", data => {
     MY_VOTED_RESTART = data.votes.includes(MY_ID);
     const btn = $("vote-reset-btn");
     btn.classList.toggle("voted", MY_VOTED_RESTART);
-    btn.textContent = MY_VOTED_RESTART ? "✅ Voted" : "🔄 Reset";
 });
 
 socket.on("gameRestarted", () => {
     MY_VOTED_RESTART = false;
-    $("vote-reset-btn").classList.remove("voted");
-    $("vote-reset-btn").textContent = "🔄 Reset";
-    $("reset-vote-info").textContent = "0/4";
+    $("vote-reset-info").textContent = "0/4";
 });
 
-// LEAVE ROOM
+// LEAVE
 $("leave-fab").onclick = () => {
     Sound.pass();
     vibrate(50);
@@ -125,15 +193,12 @@ $("leave-confirm-yes").onclick = () => {
     hide($("leave-confirm-panel"));
     hide($("game"));
     show($("lobby"));
-    $("lobby-msg").textContent = "✅ Room chhod diya. Naya room join kar sakte ho.";
-    $("lobby-msg").style.color = "#2ecc71";
     MY_ID = null;
     ROOM_ID = null;
     PLAYER_NAMES = {};
     BID_WINNER_ID = null;
     $("players-list").innerHTML = "";
-    $("room-id").value = "";
-    $("room-password").value = "";
+    hide($("lobby-form"));
 };
 
 socket.on("playerLeft", data => {
@@ -141,7 +206,7 @@ socket.on("playerLeft", data => {
     Sound.pass();
 });
 
-// HISTORY SLIDE PANEL
+// HISTORY
 $("history-fab").onclick = () => {
     Sound.bid();
     show($("history-overlay"));
@@ -200,6 +265,13 @@ function refreshAllSeats() {
                     let n = PLAYER_NAMES[pid] || `P${pid}`;
                     if (pid === MY_ID) n = `${n} (You)`;
                     nameEl.textContent = n;
+
+                    // Avatar update
+                    const avatarEl = $(`${pos}-avatar`);
+                    if (avatarEl) {
+                        const isBot = (PLAYER_NAMES[pid] || "").includes("Bot") || (PLAYER_NAMES[pid] || "").startsWith("🤖");
+                        avatarEl.textContent = isBot ? "🤖" : "🧑";
+                    }
                     break;
                 }
             }
@@ -344,19 +416,12 @@ socket.on("roundStarted", data => {
     setActivePlayer(data.currentPlayerId);
     setTrickLeader(data.leadPlayerId || data.currentPlayerId);
 
-    const table = $("table");
-    if (table) {
-        table.classList.remove("flash-turn");
-        void table.offsetWidth;
-        table.classList.add("flash-turn");
-    }
-
     showMsg(data.currentPlayerId === MY_ID
         ? "🎯 Tumhari baari"
         : `⏳ ${getPlayerName(data.currentPlayerId)} ki baari`);
 });
 
-// CARD RENDERING — SIMPLE
+// CARD RENDER — SIMPLE
 function createCardEl(card, isPlayable = false) {
     const d = document.createElement("div");
     d.className = "card";
@@ -442,7 +507,7 @@ function clearAllSlots() {
     });
 }
 
-// TEAMMATE REVEALED CARDS
+// TEAMMATE REVEALED
 socket.on("revealedHandUpdate", data => renderTeammateCards(data.revealedHand, data.revealedOwnerId));
 
 function renderTeammateCards(hand, ownerId) {
@@ -530,43 +595,43 @@ socket.on("gameOver", data => {
 $("close-result-btn").onclick = () => hide($("game-over-panel"));
 
 // PLAYER BOX STATE
-function getBoxByPlayerId(pid) {
+function getSeatElByPlayerId(pid) {
     const pos = getSeatPosition(pid);
     if (!pos) return null;
-    return $(`seat-${pos}`).querySelector(".player-box");
+    return $(`seat-${pos}`);
 }
 
 function setActivePlayer(pid) {
-    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("active"));
     if (!pid) return;
-    const box = getBoxByPlayerId(pid);
-    if (box) box.classList.add("active");
+    const seat = getSeatElByPlayerId(pid);
+    if (seat) seat.classList.add("active");
 }
 
 function clearActivePlayer() {
-    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("active"));
 }
 
 function setTrickLeader(pid) {
-    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("leader"));
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader"));
     if (!pid) return;
-    const box = getBoxByPlayerId(pid);
-    if (box) box.classList.add("leader");
+    const seat = getSeatElByPlayerId(pid);
+    if (seat) seat.classList.add("leader");
 }
 
 function clearActiveLeader() {
-    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("leader", "active"));
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader", "active"));
 }
 
 function setBidWinner(pid) {
-    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("bid-winner"));
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner"));
     if (!pid) return;
-    const box = getBoxByPlayerId(pid);
-    if (box) box.classList.add("bid-winner");
+    const seat = getSeatElByPlayerId(pid);
+    if (seat) seat.classList.add("bid-winner");
 }
 
 function clearBidWinner() {
-    document.querySelectorAll(".player-box").forEach(el => el.classList.remove("bid-winner"));
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner"));
 }
 
 // STATS
@@ -586,6 +651,14 @@ function updatePlayerStats(players) {
             tricksEl.textContent = p.tricks;
         }
     });
+
+    const myPlayer = players.find(p => p.id === MY_ID);
+    if (myPlayer) {
+        const bottomTricks = $("bottom-tricks");
+        if (bottomTricks && myPlayer.tricks !== undefined) {
+            bottomTricks.textContent = myPlayer.tricks;
+        }
+    }
 }
 
 function resetAllTricks() {
