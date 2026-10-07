@@ -101,7 +101,8 @@ function createRoom(roomId, password) {
         roundStarted: false,
         gameEnded: false,
         restartVotes: new Set(),
-        isBotGame: false
+        isBotGame: false,
+        spectators: []
     };
 }
 
@@ -410,6 +411,13 @@ function sendGameStart(room) {
             });
         } catch (e) { console.error("sendGameStart:", e.message); }
     });
+    // Also notify spectators of new round
+    io.to(room.id).emit("spectatorGameStart", {
+        phase: room.phase,
+        players: room.players.map(pl => ({ id: pl.id, name: pl.name, team: pl.team, handSize: pl.hand.length, tricks: pl.tricks })),
+        currentBid: room.currentBid,
+        teamAScore: room.teamAScore, teamBScore: room.teamBScore
+    });
 }
 
 function sendBidUpdate(room) {
@@ -616,7 +624,7 @@ function botPlay(room, bot) {
         if (res2.error) return;
     }
 
-    // ✅ FIX: Revealed teammate hand update (bot ke liye bhi)
+    // Revealed teammate hand update
     if (room.teammateRevealed && room.highestBidder !== null && room.players[room.highestBidder]) {
         const mateId = TEAMMATES[room.players[room.highestBidder].id];
         if (mateId && bot.id === mateId) {
@@ -654,9 +662,7 @@ function botPlay(room, bot) {
                         const winner = room.teamAScore >= WIN_SCORE ? "A" : "B";
                         room.gameEnded = winner;
                         io.to(room.id).emit("gameOver", {
-                            winner,
-                            teamAScore: room.teamAScore,
-                            teamBScore: room.teamBScore
+                            winner, teamAScore: room.teamAScore, teamBScore: room.teamBScore
                         });
                     } else {
                         setTimeout(() => {
@@ -671,9 +677,7 @@ function botPlay(room, bot) {
                     io.to(room.id).emit("roundEnd", result);
                     if (room.gameEnded) {
                         io.to(room.id).emit("gameOver", {
-                            winner: room.gameEnded,
-                            teamAScore: room.teamAScore,
-                            teamBScore: room.teamBScore
+                            winner: room.gameEnded, teamAScore: room.teamAScore, teamBScore: room.teamBScore
                         });
                     } else {
                         setTimeout(() => {
@@ -699,7 +703,7 @@ function botPlay(room, bot) {
 io.on("connection", socket => {
 
     // JOIN ROOM
-    socket.on("joinRoom", ({ roomId, playerName, password }) => {
+    socket.on("joinRoom", ({ roomId, playerName, password, isSpectator }) => {
         if (rooms[roomId]) {
             const room = rooms[roomId];
             const anyConnected = room.players.some(p => p.connected);
@@ -713,8 +717,45 @@ io.on("connection", socket => {
         }
 
         const room = rooms[roomId];
+
+        // ======================================================
+        // SPECTATOR MODE
+        // ======================================================
+        if (isSpectator) {
+            const specId = room.spectators.length + 1;
+            room.spectators.push({
+                id: specId,
+                name: playerName || `Spectator ${specId}`,
+                socketId: socket.id
+            });
+
+            socket.join(roomId);
+            socket.data.roomId = roomId;
+            socket.data.isSpectator = true;
+
+            socket.emit("joined", { playerId: -specId, roomId, isSpectator: true });
+
+            socket.emit("spectatorJoined", {
+                room: {
+                    phase: room.phase,
+                    teamAScore: room.teamAScore,
+                    teamBScore: room.teamBScore,
+                    players: room.players.map(p => ({
+                        id: p.id, name: p.name, team: p.team,
+                        handSize: p.hand.length, tricks: p.tricks
+                    }))
+                }
+            });
+
+            console.log(`👀 Spectator joined room ${roomId}`);
+            return;
+        }
+
+        // ======================================================
+        // NORMAL PLAYER JOIN
+        // ======================================================
         const seat = room.players.find(p => !p.connected);
-        if (!seat) return socket.emit("joinError", "Room full");
+        if (!seat) return socket.emit("joinError", "Room full — try Spectate mode");
 
         seat.connected = true;
         seat.socketId = socket.id;
@@ -777,7 +818,6 @@ io.on("connection", socket => {
             }))
         });
 
-        // DIRECT 13 CARDS — no warmup
         dealMainFresh(room);
         sendGameStart(room);
         sendBidUpdate(room);
@@ -855,7 +895,7 @@ io.on("connection", socket => {
         }
     });
 
-    // REVEAL DECISION
+    // REVEAL
     socket.on("revealDecision", ({ decision }) => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
@@ -895,12 +935,7 @@ io.on("connection", socket => {
             io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
         }
 
-        if (
-            room.teammateRevealed &&
-            room.highestBidder !== null &&
-            room.highestBidder !== undefined &&
-            room.players[room.highestBidder]
-        ) {
+        if (room.teammateRevealed && room.highestBidder !== null && room.players[room.highestBidder]) {
             const mateId = TEAMMATES[room.players[room.highestBidder].id];
             if (mateId && pid === mateId) broadcastRevealedHandUpdate(room);
         }
@@ -1002,8 +1037,16 @@ io.on("connection", socket => {
         const roomId = socket.data.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
-        const player = room.players.find(p => p.socketId === socket.id);
 
+        if (socket.data.isSpectator) {
+            room.spectators = room.spectators.filter(s => s.socketId !== socket.id);
+            socket.leave(roomId);
+            socket.data.roomId = null;
+            socket.data.isSpectator = false;
+            return;
+        }
+
+        const player = room.players.find(p => p.socketId === socket.id);
         if (player) {
             player.connected = false;
             player.socketId = null;
@@ -1022,7 +1065,7 @@ io.on("connection", socket => {
         socket.data.playerId = null;
 
         const anyConnected = room.players.some(p => p.connected && !p.isBot);
-        if (!anyConnected) {
+        if (!anyConnected && room.spectators.length === 0) {
             delete rooms[roomId];
             console.log(`🗑️ Room ${roomId} deleted`);
         }
@@ -1033,6 +1076,12 @@ io.on("connection", socket => {
         const roomId = socket.data.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
+
+        if (socket.data.isSpectator) {
+            room.spectators = room.spectators.filter(s => s.socketId !== socket.id);
+            return;
+        }
+
         const player = room.players.find(p => p.socketId === socket.id);
         if (player) {
             player.connected = false;

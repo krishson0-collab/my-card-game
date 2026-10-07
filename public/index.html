@@ -53,6 +53,10 @@
             </button>
         </div>
 
+        <button class="spectate-btn" id="spectate-btn">
+            👀 Spectate Game
+        </button>
+
         <div id="lobby-form" class="hidden">
             <div class="lobby-form-box">
                 <h3 id="form-title">Join Room</h3>
@@ -125,6 +129,7 @@
     </div>
 
     <div id="table">
+
         <div class="seat seat-top" id="seat-top">
             <div class="player-badge">
                 <span class="pb-name" id="top-name">-</span>
@@ -135,7 +140,6 @@
                 <div class="player-avatar" id="top-avatar">🤖</div>
                 <div class="score-badge"><span id="top-tricks">0</span>/<span id="top-count">5</span></div>
             </div>
-            <div class="played-slot" id="slot-top"></div>
         </div>
 
         <div class="seat seat-left" id="seat-left">
@@ -148,7 +152,6 @@
                 <div class="player-avatar" id="left-avatar">🤖</div>
                 <div class="score-badge"><span id="left-tricks">0</span>/<span id="left-count">5</span></div>
             </div>
-            <div class="played-slot" id="slot-left"></div>
         </div>
 
         <div class="seat seat-right" id="seat-right">
@@ -161,12 +164,17 @@
                 <div class="player-avatar" id="right-avatar">🤖</div>
                 <div class="score-badge"><span id="right-tricks">0</span>/<span id="right-count">5</span></div>
             </div>
-            <div class="played-slot" id="slot-right"></div>
         </div>
 
-        <div class="seat seat-bottom" id="seat-bottom">
-            <div class="played-slot" id="slot-bottom"></div>
+        <div class="seat seat-bottom" id="seat-bottom"></div>
+
+        <div id="played-cards-center">
+            <div class="pc-slot pc-top" id="slot-top"></div>
+            <div class="pc-slot pc-left" id="slot-left"></div>
+            <div class="pc-slot pc-right" id="slot-right"></div>
+            <div class="pc-slot pc-bottom" id="slot-bottom"></div>
         </div>
+
     </div>
 
     <div id="my-area">

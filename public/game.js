@@ -9,6 +9,7 @@ let PLAYER_NAMES = {};
 let BID_WINNER_ID = null;
 let CURRENT_MODE = "online";
 let TEAMMATE_CARDS_VISIBLE = true;
+let IS_SPECTATOR = false;
 
 const $ = id => document.getElementById(id);
 const show = el => el.classList.remove("hidden");
@@ -44,7 +45,9 @@ $("sound-btn").onclick = () => {
     vibrate(30);
 };
 
+// ======================================================
 // LOBBY
+// ======================================================
 function openLobbyForm(mode) {
     CURRENT_MODE = mode;
     const form = $("lobby-form");
@@ -66,6 +69,8 @@ function openLobbyForm(mode) {
         title.textContent = "🔒 Private Room";
     } else if (mode === "local") {
         title.textContent = "📱 Play Locally";
+    } else if (mode === "spectate") {
+        title.textContent = "👀 Spectate Room";
     }
 
     $("lobby-msg").textContent = "";
@@ -76,6 +81,7 @@ $("bot-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("bot"); }
 $("online-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("online"); };
 $("private-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("private"); };
 $("local-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("local"); };
+$("spectate-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("spectate"); };
 $("form-back").onclick = () => { Sound.pass(); hide($("lobby-form")); };
 
 $("join-btn").onclick = () => {
@@ -90,13 +96,22 @@ $("join-btn").onclick = () => {
         const botRoom = "bot_" + Date.now();
         Sound.bid();
         vibrate(30);
-        console.log("🤖 Starting bot game:", botRoom, name);
         socket.emit("startBotGame", { roomId: botRoom, playerName: name });
         return;
     }
 
     if (!room) return ($("lobby-msg").textContent = "Room code daalo");
     if (CURRENT_MODE === "private" && !password) return ($("lobby-msg").textContent = "Password daalo");
+
+    if (CURRENT_MODE === "spectate") {
+        socket.emit("joinRoom", {
+            roomId: room,
+            playerName: name,
+            password: password,
+            isSpectator: true
+        });
+        return;
+    }
 
     ROOM_ID = room;
     MY_NAME = name;
@@ -106,13 +121,40 @@ $("join-btn").onclick = () => {
 const savedName = localStorage.getItem("playerName");
 if (savedName) $("profile-name-display").textContent = savedName;
 
+// ======================================================
+// SOCKET
+// ======================================================
 socket.on("joinError", msg => { $("lobby-msg").textContent = "❌ " + msg; Sound.error(); });
 
 socket.on("joined", data => {
     MY_ID = data.playerId;
     ROOM_ID = data.roomId;
+
+    if (data.isSpectator) {
+        IS_SPECTATOR = true;
+        document.body.classList.add("spectator-mode");
+        const banner = document.createElement("div");
+        banner.id = "spectator-banner";
+        banner.textContent = "👀 Spectating";
+        document.body.appendChild(banner);
+    }
+
     hide($("lobby"));
     show($("game"));
+});
+
+socket.on("spectatorJoined", data => {
+    if (data.room.players) {
+        data.room.players.forEach(p => { PLAYER_NAMES[p.id] = p.name; });
+        refreshAllSeats();
+        updatePlayerStats(data.room.players);
+    }
+    if (data.room.teamAScore !== undefined) {
+        $("team-a-score").textContent = data.room.teamAScore;
+        $("team-b-score").textContent = data.room.teamBScore;
+    }
+    if (data.room.phase) updatePhaseUI(data.room.phase);
+    showMsg("👀 Aap spectator ho. Game dekho!");
 });
 
 socket.on("roomUpdate", data => {
@@ -169,7 +211,9 @@ $("leave-confirm-yes").onclick = () => {
 
 socket.on("playerLeft", data => { showMsg(`👋 ${data.playerName} ne room chhod diya`); Sound.pass(); });
 
+// ======================================================
 // GAME START
+// ======================================================
 socket.on("gameStart", data => {
     MY_ID = data.yourId;
     CURRENT_PHASE = data.phase;
@@ -237,6 +281,9 @@ function updatePhaseUI(phase) {
     else { hide($("warmup-bid-buttons")); show($("main-bid-buttons")); }
 }
 
+// ======================================================
+// BIDDING
+// ======================================================
 document.querySelectorAll(".bid-button, .bid-button-warmup").forEach(b => {
     b.onclick = () => {
         if (b.disabled) return;
@@ -249,7 +296,6 @@ $("pass-button").onclick = () => {
     if ($("pass-button").disabled) return;
     Sound.pass(); vibrate(50); socket.emit("pass");
 };
-
 $("pass-button-main").onclick = () => {
     if ($("pass-button-main").disabled) return;
     Sound.pass(); vibrate(50); socket.emit("pass");
@@ -273,11 +319,8 @@ socket.on("bidUpdate", data => {
         enableBidButtons(false);
     }
 
-    if (data.biddingActive) {
-        setActivePlayer(data.nextBidderId);
-    } else {
-        clearActivePlayer();
-    }
+    if (data.biddingActive) setActivePlayer(data.nextBidderId);
+    else clearActivePlayer();
 });
 
 function enableBidButtons(on) {
@@ -290,7 +333,6 @@ function enableBidButtons(on) {
 socket.on("biddingFinished", data => {
     $("bid-ui").classList.remove("active");
     enableBidButtons(false);
-
     showMsg(`👑 ${data.highestBidderName} — ${data.highestBid}`);
     BID_WINNER_ID = data.highestBidderId;
     setBidWinner(data.highestBidderId);
@@ -299,6 +341,9 @@ socket.on("biddingFinished", data => {
 
 socket.on("warmupSkipped", () => showMsg("⏭️ Sab pass — main round!"));
 
+// ======================================================
+// TRUMP
+// ======================================================
 document.querySelectorAll("#trump-buttons button").forEach(b => {
     b.onclick = () => {
         Sound.bid(); vibrate(30);
@@ -309,7 +354,6 @@ document.querySelectorAll("#trump-buttons button").forEach(b => {
 
 socket.on("trumpSet", data => {
     const chooserName = data.highestBidderName || getPlayerName(data.highestBidderId);
-
     $("trump-display").textContent = data.trumpSuit;
     $("trump-chooser-name").textContent = chooserName ? `(${chooserName})` : "";
 
@@ -325,17 +369,11 @@ socket.on("trumpSet", data => {
     if (data.waitReveal && data.highestBidderId === MY_ID) show($("reveal-panel"));
 });
 
-$("reveal-yes").onclick = () => {
-    Sound.bid();
-    socket.emit("revealDecision", { decision: "show" });
-    hide($("reveal-panel"));
-};
-
-$("reveal-no").onclick = () => {
-    Sound.pass();
-    socket.emit("revealDecision", { decision: "hide" });
-    hide($("reveal-panel"));
-};
+// ======================================================
+// REVEAL
+// ======================================================
+$("reveal-yes").onclick = () => { Sound.bid(); socket.emit("revealDecision", { decision: "show" }); hide($("reveal-panel")); };
+$("reveal-no").onclick = () => { Sound.pass(); socket.emit("revealDecision", { decision: "hide" }); hide($("reveal-panel")); };
 
 socket.on("teammateRevealed", data => {
     if (data.revealed) {
@@ -367,6 +405,9 @@ $("toggle-reveal-btn").onclick = () => {
     Sound.bid(); vibrate(30);
 };
 
+// ======================================================
+// ROUND START
+// ======================================================
 socket.on("roundStarted", data => {
     CURRENT_PHASE = data.phase;
     updatePhaseUI(data.phase);
@@ -407,6 +448,9 @@ socket.on("roundStarted", data => {
     showMsg(data.currentPlayerId === MY_ID ? "🎯 Tumhari baari" : `⏳ ${getPlayerName(data.currentPlayerId)} ki baari`);
 });
 
+// ======================================================
+// CARDS
+// ======================================================
 function createCardEl(card, isPlayable = false) {
     const d = document.createElement("div");
     d.className = "card";
@@ -427,6 +471,7 @@ function createCardEl(card, isPlayable = false) {
 }
 
 function renderHand(hand) {
+    if (IS_SPECTATOR) return;
     const c = $("player1-cards");
     c.innerHTML = "";
     hand.forEach((card, i) => {
@@ -447,7 +492,7 @@ socket.on("cardPlayed", data => {
     showMsg(`${displayName} → ${data.card.rank}${data.card.suit}`);
     if (data.nextPlayerId) {
         setActivePlayer(data.nextPlayerId);
-        if (data.nextPlayerId === MY_ID) {
+        if (data.nextPlayerId === MY_ID && !IS_SPECTATOR) {
             setTimeout(() => { Sound.yourTurn(); vibrate([100, 50, 100]); }, 400);
         }
     } else clearActivePlayer();
@@ -475,6 +520,9 @@ function clearAllSlots() {
     });
 }
 
+// ======================================================
+// TEAMMATE REVEALED
+// ======================================================
 socket.on("revealedHandUpdate", data => renderTeammateCards(data.revealedHand, data.revealedOwnerId));
 
 function renderTeammateCards(hand, ownerId) {
@@ -488,11 +536,14 @@ function renderTeammateCards(hand, ownerId) {
     if (btn) { btn.textContent = "🙈 Hide"; btn.classList.remove("hidden-state"); }
 }
 
+// ======================================================
+// TRICK RESOLVED
+// ======================================================
 socket.on("trickResolved", data => {
     if (data.warmupFailed) showMsg(`💥 Warmup khatam — bidder ki team haar gayi!`);
     else showMsg(`🏆 ${getPlayerName(data.winnerId)} ne trick ${data.trickNumber} jeeti`);
 
-    if (data.winnerId === MY_ID) { Sound.trickWin(); vibrate([50, 30, 50, 30, 100]); }
+    if (data.winnerId === MY_ID && !IS_SPECTATOR) { Sound.trickWin(); vibrate([50, 30, 50, 30, 100]); }
 
     setTimeout(() => clearAllSlots(), 1200);
     updatePlayerStats(data.players);
@@ -500,6 +551,9 @@ socket.on("trickResolved", data => {
     setTrickLeader(data.leadPlayerId || data.nextPlayerId);
 });
 
+// ======================================================
+// ROUND END
+// ======================================================
 socket.on("roundEnd", result => {
     $("team-a-score").textContent = result.teamAScore;
     $("team-b-score").textContent = result.teamBScore;
@@ -530,6 +584,9 @@ function addRoundHistory(text, aScore, bScore) {
     c.scrollTop = c.scrollHeight;
 }
 
+// ======================================================
+// GAME OVER
+// ======================================================
 socket.on("gameOver", data => {
     const winnerName = data.winner === "A" ? "Team A" : "Team B";
     $("winner-team").textContent = `🎉 ${winnerName} Wins!`;
@@ -541,18 +598,18 @@ socket.on("gameOver", data => {
     show($("game-over-panel"));
 
     const myTeam = (MY_ID === 1 || MY_ID === 2) ? "A" : "B";
-    if (data.winner === myTeam) {
-        Sound.gameWin();
-        launchConfetti();
-        vibrate([200, 100, 200, 100, 400]);
-    } else {
-        Sound.gameLose();
-        vibrate(500);
+    if (data.winner === myTeam && !IS_SPECTATOR) {
+        Sound.gameWin(); launchConfetti(); vibrate([200, 100, 200, 100, 400]);
+    } else if (!IS_SPECTATOR) {
+        Sound.gameLose(); vibrate(500);
     }
 });
 
 $("close-result-btn").onclick = () => hide($("game-over-panel"));
 
+// ======================================================
+// PLAYER STATE
+// ======================================================
 function getSeatElByPlayerId(pid) {
     const pos = getSeatPosition(pid);
     if (!pos) return null;
@@ -566,9 +623,7 @@ function setActivePlayer(pid) {
     if (seat) seat.classList.add("active");
 }
 
-function clearActivePlayer() {
-    document.querySelectorAll(".seat").forEach(el => el.classList.remove("active"));
-}
+function clearActivePlayer() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("active")); }
 
 function setTrickLeader(pid) {
     document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader"));
@@ -577,9 +632,7 @@ function setTrickLeader(pid) {
     if (seat) seat.classList.add("leader");
 }
 
-function clearActiveLeader() {
-    document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader", "active"));
-}
+function clearActiveLeader() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader", "active")); }
 
 function setBidWinner(pid) {
     document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner"));
@@ -588,9 +641,7 @@ function setBidWinner(pid) {
     if (seat) seat.classList.add("bid-winner");
 }
 
-function clearBidWinner() {
-    document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner"));
-}
+function clearBidWinner() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner")); }
 
 function updatePlayerStats(players) {
     players.forEach(p => {
