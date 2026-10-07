@@ -192,7 +192,6 @@ button {
     transform: scale(1.05);
 }
 
-/* ⭐ TRICK LEADER */
 .player-box.leader::after {
     content: "⭐";
     position: absolute;
@@ -202,7 +201,6 @@ button {
     filter: drop-shadow(0 0 3px gold);
 }
 
-/* 👑 BID WINNER CROWN */
 .player-box.bid-winner::before {
     content: "👑";
     position: absolute;
@@ -219,15 +217,8 @@ button {
     50% { transform: translateY(-3px) rotate(8deg); }
 }
 
-/* Both crown and star — adjust positions */
-.player-box.bid-winner.leader::before {
-    top: -12px;
-    left: -6px;
-}
-.player-box.bid-winner.leader::after {
-    top: -10px;
-    right: -6px;
-}
+.player-box.bid-winner.leader::before { top: -12px; left: -6px; }
+.player-box.bid-winner.leader::after { top: -10px; right: -6px; }
 
 .player-box.me {
     background: rgba(240, 192, 64, 0.3);
@@ -258,7 +249,7 @@ button {
 .stat.tricks { background: rgba(240, 192, 64, 0.25); color: #f0c040; }
 
 .player-box.active .stat.cards { background: rgba(0, 0, 0, 0.2); color: #000; }
-.player-box.active .stat.tricks { background: rgba(0, 0, 0, 0.3); color: #000; }
+.player-box.active .stat.tricks { background: rgba(0, 0, 0, 0.3); }
 
 .played-slot {
     display: flex;
@@ -276,78 +267,72 @@ button {
 .seat-right .played-slot { margin-right: 3px; }
 
 /* ======================================================
-   REAL CARD DESIGN
+   SIMPLE CARD DESIGN
    ====================================================== */
 .card {
     width: 42px;
     height: 60px;
     background: #fff;
-    border-radius: 5px;
+    border-radius: 6px;
     border: 1px solid #222;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: center;
     color: #000;
     font-weight: bold;
     line-height: 1;
     flex-shrink: 0;
-    padding: 3px 4px;
-    position: relative;
-    overflow: hidden;
+    padding: 2px;
+    gap: 1px;
+    transition: transform 0.15s;
 }
 
 .card.red { color: #d00; }
 .card.black { color: #111; }
 
-/* Top-left corner */
-.card .corner {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    line-height: 0.9;
-    gap: 0;
-}
-.card .corner .rank {
-    font-size: 11px;
-    font-weight: 800;
-}
-.card .corner .suit {
-    font-size: 10px;
+.card .c-rank {
+    font-size: 18px;
+    font-weight: 900;
     line-height: 1;
 }
 
-/* Bottom-right corner (rotated 180°) */
-.card .corner.br {
-    transform: rotate(180deg);
-    align-self: flex-end;
+.card .c-suit {
+    font-size: 20px;
+    line-height: 1;
 }
 
-/* Center big suit */
-.card .center-suit {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 22px;
-    opacity: 0.9;
-    pointer-events: none;
-}
-
-/* Played cards — small */
 .played-slot .card {
     width: 36px;
     height: 52px;
-    padding: 2px 3px;
     animation: cardPop 0.25s ease-out;
 }
+
 @keyframes cardPop {
     0% { transform: scale(0.6); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
 }
-.played-slot .card .corner .rank { font-size: 9px; }
-.played-slot .card .corner .suit { font-size: 8px; }
-.played-slot .card .center-suit { font-size: 18px; }
+
+.played-slot .card .c-rank { font-size: 15px; }
+.played-slot .card .c-suit { font-size: 17px; }
+
+#player1-cards .card {
+    width: 44px;
+    height: 64px;
+    cursor: pointer;
+}
+#player1-cards .card:active { transform: translateY(-5px); }
+#player1-cards .card.playable {
+    border: 2px solid #f0c040;
+    box-shadow: 0 0 8px rgba(240, 192, 64, 0.8);
+}
+#player1-cards .card .c-rank { font-size: 19px; }
+#player1-cards .card .c-suit { font-size: 22px; }
+
+#teammate-cards-list .card { width: 32px; height: 46px; }
+#teammate-cards-list .card .c-rank { font-size: 13px; }
+#teammate-cards-list .card .c-suit { font-size: 15px; }
 
 #my-hand-area {
     background: rgba(0, 0, 0, 0.4);
@@ -373,23 +358,6 @@ button {
     -webkit-overflow-scrolling: touch;
 }
 #player1-cards::-webkit-scrollbar { display: none; }
-
-#player1-cards .card {
-    width: 44px;
-    height: 64px;
-    cursor: pointer;
-    transition: transform 0.15s;
-    flex-shrink: 0;
-    padding: 3px 4px;
-}
-#player1-cards .card:active { transform: translateY(-5px); }
-#player1-cards .card.playable {
-    border: 2px solid #f0c040;
-    box-shadow: 0 0 8px rgba(240, 192, 64, 0.8);
-}
-#player1-cards .card .corner .rank { font-size: 12px; }
-#player1-cards .card .corner .suit { font-size: 11px; }
-#player1-cards .card .center-suit { font-size: 24px; }
 
 #messages {
     background: rgba(0, 0, 0, 0.55);
@@ -652,10 +620,6 @@ button {
     -webkit-overflow-scrolling: touch;
 }
 #teammate-cards-list::-webkit-scrollbar { display: none; }
-#teammate-cards-list .card { width: 32px; height: 46px; padding: 2px 3px; }
-#teammate-cards-list .card .corner .rank { font-size: 8px; }
-#teammate-cards-list .card .corner .suit { font-size: 7px; }
-#teammate-cards-list .card .center-suit { font-size: 15px; }
 
 /* MODALS */
 #trump-panel, #reveal-panel, #game-over-panel, #leave-confirm-panel {
@@ -792,4 +756,126 @@ button {
 
 @media (max-width: 380px) {
     #bid-ui button { padding: 8px 4px; font-size: 11px; min-width: 30px; }
+}
+
+/* ======================================================
+   LANDSCAPE OPTIMIZATION
+   ====================================================== */
+@media screen and (orientation: landscape) and (max-height: 550px) {
+    body { font-size: 12px; }
+
+    #game { padding: 4px; gap: 3px; }
+
+    #header {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+
+    #score-strip {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+
+    #table {
+        padding: 6px;
+        gap: 4px;
+        min-height: 0;
+        flex: 1;
+    }
+
+    .player-box {
+        padding: 3px 8px;
+        gap: 2px;
+    }
+
+    .player-name {
+        font-size: 11px;
+        max-width: 80px;
+    }
+
+    .stat {
+        font-size: 10px;
+        padding: 1px 5px;
+    }
+
+    .played-slot {
+        min-height: 50px;
+        min-width: 42px;
+    }
+
+    .played-slot .card {
+        width: 34px;
+        height: 48px;
+    }
+
+    .played-slot .card .c-rank { font-size: 13px; }
+    .played-slot .card .c-suit { font-size: 15px; }
+
+    #my-hand-area {
+        min-height: 64px;
+        max-height: 72px;
+        padding: 4px;
+    }
+
+    #player1-cards {
+        padding: 4px 6px;
+        min-height: 62px;
+        gap: 4px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        justify-content: center;
+    }
+
+    #player1-cards .card {
+        width: 42px;
+        height: 60px;
+    }
+
+    #player1-cards .card .c-rank { font-size: 16px; }
+    #player1-cards .card .c-suit { font-size: 18px; }
+
+    #messages {
+        padding: 5px 10px;
+        font-size: 12px;
+        min-height: 26px;
+    }
+
+    #bid-ui {
+        padding: 6px 8px;
+        gap: 4px;
+    }
+
+    #bid-ui button {
+        padding: 8px 10px;
+        font-size: 13px;
+        min-height: 34px;
+    }
+
+    .bid-button-warmup {
+        padding: 8px 20px !important;
+        font-size: 14px !important;
+    }
+
+    #history-fab, #sound-fab {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+    }
+
+    #leave-fab {
+        width: 34px;
+        height: 34px;
+        font-size: 15px;
+        top: calc(60px + env(safe-area-inset-top, 0));
+    }
+
+    #teammate-cards {
+        max-height: 70px;
+        padding: 4px 6px;
+    }
+
+    #teammate-cards-list .card {
+        width: 28px;
+        height: 40px;
+    }
 }

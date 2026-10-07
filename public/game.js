@@ -33,9 +33,7 @@ function getSeatPosition(playerId) {
     return null;
 }
 
-// ======================================================
 // SOUND TOGGLE
-// ======================================================
 $("sound-fab").onclick = () => {
     Sound.init();
     Sound.enabled = !Sound.enabled;
@@ -45,9 +43,7 @@ $("sound-fab").onclick = () => {
     if (Sound.enabled) Sound.bid();
 };
 
-// ======================================================
-// LOBBY — JOIN with password
-// ======================================================
+// LOBBY
 $("join-btn").onclick = () => {
     const name = $("player-name").value.trim() || "Player";
     const room = $("room-id").value.trim().toLowerCase();
@@ -89,9 +85,7 @@ socket.on("errorMsg", msg => {
     vibrate(80);
 });
 
-// ======================================================
 // RESET VOTING
-// ======================================================
 $("vote-reset-btn").onclick = () => {
     Sound.bid();
     vibrate(30);
@@ -113,9 +107,7 @@ socket.on("gameRestarted", () => {
     $("reset-vote-info").textContent = "0/4";
 });
 
-// ======================================================
 // LEAVE ROOM
-// ======================================================
 $("leave-fab").onclick = () => {
     Sound.pass();
     vibrate(50);
@@ -149,9 +141,7 @@ socket.on("playerLeft", data => {
     Sound.pass();
 });
 
-// ======================================================
 // HISTORY SLIDE PANEL
-// ======================================================
 $("history-fab").onclick = () => {
     Sound.bid();
     show($("history-overlay"));
@@ -166,9 +156,7 @@ function closeHistoryPanel() {
 $("close-history-btn").onclick = closeHistoryPanel;
 $("history-overlay").onclick = closeHistoryPanel;
 
-// ======================================================
 // GAME START
-// ======================================================
 socket.on("gameStart", data => {
     MY_ID = data.yourId;
     CURRENT_PHASE = data.phase;
@@ -230,9 +218,7 @@ function updatePhaseUI(phase) {
     }
 }
 
-// ======================================================
 // BIDDING
-// ======================================================
 document.querySelectorAll(".bid-button, .bid-button-warmup").forEach(b => {
     b.onclick = () => {
         if (b.disabled) return;
@@ -295,9 +281,7 @@ socket.on("biddingFinished", data => {
 
 socket.on("warmupSkipped", () => showMsg("⏭️ Sab pass — main round!"));
 
-// ======================================================
 // TRUMP
-// ======================================================
 document.querySelectorAll("#trump-buttons button").forEach(b => {
     b.onclick = () => {
         Sound.bid();
@@ -315,9 +299,7 @@ socket.on("trumpSet", data => {
     if (data.waitReveal && data.highestBidderId === MY_ID) show($("reveal-panel"));
 });
 
-// ======================================================
 // REVEAL
-// ======================================================
 $("reveal-yes").onclick = () => {
     Sound.bid();
     socket.emit("revealDecision", { decision: "show" });
@@ -333,9 +315,7 @@ socket.on("teammateRevealed", data => {
     showMsg(data.revealed ? "👀 Partner ke cards khul gaye" : "🔒 Partner chhupe rahenge");
 });
 
-// ======================================================
 // ROUND START
-// ======================================================
 socket.on("roundStarted", data => {
     CURRENT_PHASE = data.phase;
     updatePhaseUI(data.phase);
@@ -351,7 +331,6 @@ socket.on("roundStarted", data => {
         hide($("teammate-cards"));
     }
 
-    // Bid winner crown
     if (data.bidWinnerId) {
         BID_WINNER_ID = data.bidWinnerId;
         setBidWinner(data.bidWinnerId);
@@ -377,9 +356,7 @@ socket.on("roundStarted", data => {
         : `⏳ ${getPlayerName(data.currentPlayerId)} ki baari`);
 });
 
-// ======================================================
-// CARD RENDERING — Real card design
-// ======================================================
+// CARD RENDERING — SIMPLE
 function createCardEl(card, isPlayable = false) {
     const d = document.createElement("div");
     d.className = "card";
@@ -387,24 +364,16 @@ function createCardEl(card, isPlayable = false) {
     if (isRed) d.classList.add("red");
     else d.classList.add("black");
 
-    // Top-left corner
-    const tl = document.createElement("div");
-    tl.className = "corner tl";
-    tl.innerHTML = `<span class="rank">${card.rank}</span><span class="suit">${card.suit}</span>`;
+    const rankEl = document.createElement("div");
+    rankEl.className = "c-rank";
+    rankEl.textContent = card.rank;
 
-    // Bottom-right corner (rotated)
-    const br = document.createElement("div");
-    br.className = "corner br";
-    br.innerHTML = `<span class="rank">${card.rank}</span><span class="suit">${card.suit}</span>`;
+    const suitEl = document.createElement("div");
+    suitEl.className = "c-suit";
+    suitEl.textContent = card.suit;
 
-    // Center big suit
-    const center = document.createElement("div");
-    center.className = "center-suit";
-    center.textContent = card.suit;
-
-    d.appendChild(tl);
-    d.appendChild(center);
-    d.appendChild(br);
+    d.appendChild(rankEl);
+    d.appendChild(suitEl);
 
     if (isPlayable) d.classList.add("playable");
     return d;
@@ -426,11 +395,12 @@ function renderHand(hand) {
 
 socket.on("handUpdate", data => renderHand(data.hand));
 
-// ======================================================
 // PLAYED CARDS
-// ======================================================
 socket.on("cardPlayed", data => {
     renderPlayedCards(data.trickCards);
+    requestAnimationFrame(() => {
+        renderPlayedCards(data.trickCards);
+    });
     Sound.cardPlay();
     const displayName = data.playerName || getPlayerName(data.playerId);
     showMsg(`${displayName} → ${data.card.rank}${data.card.suit}`);
@@ -451,6 +421,7 @@ socket.on("cardPlayed", data => {
 });
 
 function renderPlayedCards(trickCards) {
+    if (!trickCards) return;
     clearAllSlots();
     trickCards.forEach(item => {
         const pid = item.playerIndex + 1;
@@ -461,6 +432,7 @@ function renderPlayedCards(trickCards) {
         const cardEl = createCardEl(item.card);
         slot.appendChild(cardEl);
     });
+    document.body.offsetHeight;
 }
 
 function clearAllSlots() {
@@ -470,9 +442,7 @@ function clearAllSlots() {
     });
 }
 
-// ======================================================
 // TEAMMATE REVEALED CARDS
-// ======================================================
 socket.on("revealedHandUpdate", data => renderTeammateCards(data.revealedHand, data.revealedOwnerId));
 
 function renderTeammateCards(hand, ownerId) {
@@ -483,9 +453,7 @@ function renderTeammateCards(hand, ownerId) {
     hand.forEach(card => c.appendChild(createCardEl(card)));
 }
 
-// ======================================================
 // TRICK RESOLVED
-// ======================================================
 socket.on("trickResolved", data => {
     if (data.warmupFailed) {
         showMsg(`💥 Warmup khatam — bidder ki team haar gayi!`);
@@ -505,9 +473,7 @@ socket.on("trickResolved", data => {
     setTrickLeader(data.leadPlayerId || data.nextPlayerId);
 });
 
-// ======================================================
 // ROUND END
-// ======================================================
 socket.on("roundEnd", result => {
     $("team-a-score").textContent = result.teamAScore;
     $("team-b-score").textContent = result.teamBScore;
@@ -539,9 +505,7 @@ function addRoundHistory(text, aScore, bScore) {
     c.scrollTop = c.scrollHeight;
 }
 
-// ======================================================
 // GAME OVER
-// ======================================================
 socket.on("gameOver", data => {
     const winnerName = data.winner === "A" ? "Team A" : "Team B";
     $("winner-team").textContent = `🎉 ${winnerName} Wins!`;
@@ -565,9 +529,7 @@ socket.on("gameOver", data => {
 
 $("close-result-btn").onclick = () => hide($("game-over-panel"));
 
-// ======================================================
 // PLAYER BOX STATE
-// ======================================================
 function getBoxByPlayerId(pid) {
     const pos = getSeatPosition(pid);
     if (!pos) return null;
@@ -596,7 +558,6 @@ function clearActiveLeader() {
     document.querySelectorAll(".player-box").forEach(el => el.classList.remove("leader", "active"));
 }
 
-// 👑 Bid winner crown
 function setBidWinner(pid) {
     document.querySelectorAll(".player-box").forEach(el => el.classList.remove("bid-winner"));
     if (!pid) return;
@@ -608,9 +569,7 @@ function clearBidWinner() {
     document.querySelectorAll(".player-box").forEach(el => el.classList.remove("bid-winner"));
 }
 
-// ======================================================
 // STATS
-// ======================================================
 function updatePlayerStats(players) {
     players.forEach(p => {
         const pos = getSeatPosition(p.id);
@@ -636,9 +595,7 @@ function resetAllTricks() {
     });
 }
 
-// ======================================================
 // BID HISTORY
-// ======================================================
 function renderBidHistory(history) {
     const c = $("bid-history-list");
     if (!c) return;

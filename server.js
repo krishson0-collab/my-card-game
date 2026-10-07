@@ -32,7 +32,7 @@ const MAIN_START_BID = 7;
 const MAIN_MIN_BID = 8;
 const MAIN_MAX_BID = 13;
 const MAIN_TRICKS = 13;
-const REVEAL_THRESHOLD = 10;
+const REVEAL_THRESHOLD = 9;
 const WIN_SCORE = 52;
 
 // ======================================================
@@ -428,7 +428,7 @@ function broadcastRoundStart(room) {
 }
 
 function broadcastRevealedHandUpdate(room) {
-    if (!room.teammateRevealed || room.highestBidder === null) return;
+    if (!room.teamm.highestBidder === null) return;
     const bidderId = room.players[room.highestBidder].id;
     const mateId = TEAMMATES[bidderId];
     io.to(room.id).emit("revealedHandUpdate", { revealedHand: room.players[mateId - 1].hand, revealedOwnerId: mateId });
