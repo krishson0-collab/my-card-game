@@ -9,10 +9,8 @@
 </head>
 <body>
 
-<!-- LOBBY -->
 <div id="lobby">
     <div class="lobby-content">
-
         <div class="profile-card">
             <div class="profile-avatar">🧑</div>
             <div class="profile-info">
@@ -31,19 +29,16 @@
                 <div class="mode-title">Practice</div>
                 <div class="mode-sub">Bots ke saath</div>
             </button>
-
             <button class="mode-card" id="online-btn">
                 <div class="mode-icon">👤</div>
                 <div class="mode-title">Play Online</div>
                 <div class="mode-sub">Friends ke saath</div>
             </button>
-
             <button class="mode-card" id="private-btn">
                 <div class="mode-icon">🔒</div>
                 <div class="mode-title">Play Privately</div>
                 <div class="mode-sub">Password room</div>
             </button>
-
             <button class="mode-card" id="local-btn">
                 <div class="mode-icon">📱</div>
                 <div class="mode-title">Play Locally</div>
@@ -54,24 +49,19 @@
         <div id="lobby-form" class="hidden">
             <div class="lobby-form-box">
                 <h3 id="form-title">Join Room</h3>
-
                 <div class="input-group">
                     <label class="input-label">👤 Tumhara Naam</label>
                     <input id="player-name" placeholder="Rahul" maxlength="20" autocomplete="off" />
                 </div>
-
                 <div class="input-group" id="room-code-group">
                     <label class="input-label">🚪 Room Code</label>
                     <input id="room-id" placeholder="dost123" maxlength="20" autocomplete="off" />
                 </div>
-
                 <div class="input-group" id="room-pass-group">
                     <label class="input-label">🔒 Password</label>
                     <input id="room-password" placeholder="Password" maxlength="20" type="password" autocomplete="off" />
                 </div>
-
                 <p id="lobby-msg"></p>
-
                 <div class="form-buttons">
                     <button id="form-back">← Back</button>
                     <button id="join-btn">Start →</button>
@@ -84,7 +74,6 @@
     </div>
 </div>
 
-<!-- GAME -->
 <div id="game" class="hidden">
 
     <div id="top-bar">
@@ -94,6 +83,11 @@
                 <div class="rb-label">Round</div>
                 <div class="rb-value"><span id="round-counter">1/5</span></div>
             </div>
+        </div>
+
+        <div id="trump-indicator" class="empty">
+            <span id="trump-icon">-</span>
+            <span id="trump-name-small"></span>
         </div>
 
         <div class="top-right-icons">
