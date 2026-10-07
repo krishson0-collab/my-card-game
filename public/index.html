@@ -87,42 +87,42 @@
 <!-- GAME -->
 <div id="game" class="hidden">
 
-    <!-- TOP RIGHT BUTTONS -->
-    <div id="top-right-buttons">
-        <button class="trb" id="sound-fab" title="Sound">🔊</button>
-        <button class="trb" id="reset-vote-btn" title="Vote Reset">
-            🔄<span class="trb-badge" id="reset-vote-badge">0</span>
-        </button>
-        <button class="trb" id="history-btn" title="History">📋</button>
-        <button class="trb" id="leave-fab" title="Exit">🚪</button>
-    </div>
+    <div id="top-bar">
+        <div class="round-badge">
+            <div class="rb-icon">📋</div>
+            <div class="rb-text">
+                <div class="rb-label">Round</div>
+                <div class="rb-value"><span id="round-counter">1/5</span></div>
+            </div>
+        </div>
 
-    <!-- ROUND BADGE (top-left) -->
-    <div class="round-badge">
-        <div class="rb-icon">📋</div>
-        <div class="rb-text">
-            <div class="rb-label">Round</div>
-            <div class="rb-value"><span id="round-counter">1/5</span></div>
+        <div class="top-right-icons">
+            <div class="icon-btn" id="sound-btn"><span class="icon-emoji">🔊</span></div>
+            <div class="icon-btn" id="reset-vote-btn">
+                <span class="icon-emoji">🔄</span>
+                <span class="icon-badge" id="reset-vote-badge">0</span>
+            </div>
+            <div class="icon-btn" id="history-btn"><span class="icon-emoji">📋</span></div>
+            <div class="icon-btn" id="settings-btn"><span class="icon-emoji">⚙️</span></div>
+            <div class="icon-btn" id="leave-fab"><span class="icon-emoji">🚪</span></div>
         </div>
     </div>
 
-    <!-- HIDDEN LEGACY -->
-    <div style="display:none">
+    <div id="header" style="display:none">
         <span id="room-display">-</span>
         <span id="trump-display">-</span>
         <span id="trump-chooser-name"></span>
         <span id="phase-display">WARMUP</span>
+    </div>
+
+    <div id="score-strip" style="display:none">
         <span id="team-a-score">0</span>
         <span id="team-b-score">0</span>
-        <span id="you-display">-</span>
-        <span id="current-bid">4</span>
+        <button id="vote-reset-btn">Reset</button>
         <span id="reset-vote-info">0/4</span>
     </div>
 
-    <!-- TABLE -->
     <div id="table">
-
-        <!-- TOP PLAYER (teammate) -->
         <div class="seat seat-top" id="seat-top">
             <div class="player-badge">
                 <span class="pb-name" id="top-name">-</span>
@@ -136,7 +136,6 @@
             <div class="played-slot" id="slot-top"></div>
         </div>
 
-        <!-- LEFT PLAYER -->
         <div class="seat seat-left" id="seat-left">
             <div class="player-badge">
                 <span class="pb-name" id="left-name">-</span>
@@ -150,7 +149,6 @@
             <div class="played-slot" id="slot-left"></div>
         </div>
 
-        <!-- RIGHT PLAYER -->
         <div class="seat seat-right" id="seat-right">
             <div class="player-badge">
                 <span class="pb-name" id="right-name">-</span>
@@ -164,23 +162,19 @@
             <div class="played-slot" id="slot-right"></div>
         </div>
 
-        <!-- CENTER -->
-        <div class="seat seat-center">
+        <div class="seat seat-bottom" id="seat-bottom">
             <div class="played-slot" id="slot-bottom"></div>
         </div>
-
     </div>
 
-    <!-- TEAMMATE HIDE TOGGLE BUTTON -->
-    <button id="toggle-reveal-btn" class="toggle-reveal-btn hidden">🙈 Hide</button>
-
-    <!-- TEAMMATE REVEALED CARDS -->
     <div id="teammate-cards" class="hidden">
-        <h4>👀 Partner — <span id="revealed-owner">?</span></h4>
+        <div class="tc-header">
+            <h4>👀 Partner — <span id="revealed-owner">?</span></h4>
+            <button id="toggle-reveal-btn" class="toggle-reveal-btn">🙈 Hide</button>
+        </div>
         <div id="teammate-cards-list"></div>
     </div>
 
-    <!-- MY CARDS -->
     <div id="my-area">
         <div id="my-avatar-row">
             <div class="my-avatar-wrap">
@@ -197,10 +191,8 @@
         <div id="player1-cards"></div>
     </div>
 
-    <!-- MESSAGE -->
     <div id="messages"><div id="game-message">Waiting...</div></div>
 
-    <!-- BID UI -->
     <div id="bid-ui">
         <div id="bid-turn-info"></div>
         <div id="warmup-bid-buttons" class="hidden">
@@ -218,7 +210,6 @@
         </div>
     </div>
 
-    <!-- HISTORY -->
     <div id="history-overlay" class="hidden"></div>
     <div id="history-panel" class="hidden">
         <div class="drag-bar"></div>
@@ -229,7 +220,6 @@
         </div>
     </div>
 
-    <!-- SETTINGS -->
     <div id="settings-panel" class="hidden">
         <div class="settings-box">
             <div class="settings-header">
@@ -257,7 +247,6 @@
         </div>
     </div>
 
-    <!-- TRUMP -->
     <div id="trump-panel" class="hidden">
         <div class="trump-box">
             <h3>👑 Trump Chuno</h3>
@@ -270,7 +259,6 @@
         </div>
     </div>
 
-    <!-- REVEAL -->
     <div id="reveal-panel" class="hidden">
         <div class="reveal-box">
             <h3>Partner ke cards dikhane hain?</h3>
@@ -279,7 +267,6 @@
         </div>
     </div>
 
-    <!-- GAME OVER -->
     <div id="game-over-panel" class="hidden">
         <div class="result-box">
             <div class="trophy">🏆</div>
@@ -294,13 +281,17 @@
         </div>
     </div>
 
-    <!-- LEAVE CONFIRM -->
     <div id="leave-confirm-panel" class="hidden">
         <div class="leave-box">
             <h3>🚪 Room chhodna hai?</h3>
             <p>Aap game se bahar nikal jaoge.</p>
             <div><button id="leave-confirm-yes">Haan</button><button id="leave-confirm-no">Nahi</button></div>
         </div>
+    </div>
+
+    <div style="display:none">
+        <span id="you-display">-</span>
+        <span id="current-bid">4</span>
     </div>
 
 </div>
