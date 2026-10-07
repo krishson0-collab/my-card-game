@@ -220,9 +220,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #reset-vote-btn.voted { box-shadow: 0 0 0 2px #4cc04c; }
 #reset-vote-btn.voted .icon-badge { background: #4cc04c; color: #fff; border-color: #2a8a2a; }
 
-/* TABLE — chhota kiya taaki cards neeche shift hon */
+/* TABLE */
 #table {
-    position: relative; flex: 0.8; min-height: 0;
+    position: relative; flex: 0.75; min-height: 0;
     display: grid;
     grid-template-columns: 1fr 1.3fr 1fr;
     grid-template-rows: 1fr 1.4fr 1fr;
@@ -258,8 +258,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     width: 64px; height: 64px; border-radius: 50%;
     background: #fff; display: flex; align-items: center; justify-content: center;
     font-size: 34px; border: 3px solid #fff;
-    transition: transform 0.25s, box-shadow 0.25s;
     position: relative; z-index: 2;
+    transition: transform 0.25s, box-shadow 0.25s;
 }
 .avatar-fan {
     position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
@@ -332,12 +332,12 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .played-slot .card .c-rank { font-size: 15px; }
 .played-slot .card .c-suit { font-size: 17px; }
 
-/* MY AREA — CARDS SHIFTED DOWN */
+/* MY AREA — cards aur neeche shift */
 #my-area {
     position: relative; z-index: 5; padding: 0 6px;
     display: flex; flex-direction: column; gap: 2px;
     margin-top: auto;
-    padding-top: 40px;
+    padding-top: 70px;
 }
 #my-avatar-row {
     display: flex; align-items: flex-end; justify-content: center; gap: 0;
@@ -375,8 +375,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     justify-content: center; align-items: center;
     flex-wrap: nowrap; overflow-x: auto;
     width: 100%; padding: 6px 4px 8px;
-    min-height: 88px;
-    margin-top: 6px;
+    min-height: 100px;
+    margin-top: 10px;
     background: rgba(255, 250, 245, 0.6);
     border-radius: 16px;
     -webkit-overflow-scrolling: touch;
@@ -399,23 +399,19 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #player1-cards .card .c-rank { font-size: 19px; }
 #player1-cards .card .c-suit { font-size: 21px; }
 
+/* ======================================================
+   MESSAGE BAR — HIDDEN
+   ====================================================== */
 #messages {
-    background: rgba(255, 250, 245, 0.95);
-    padding: 8px 14px; border-radius: 12px;
-    font-size: 13px; font-weight: 800; text-align: center;
-    min-height: 32px;
-    display: flex; align-items: center; justify-content: center;
-    color: #8b2538; z-index: 5;
-    border: 1.5px solid rgba(255, 200, 200, 0.6);
-    margin: 2px 0; flex-shrink: 0;
+    display: none !important;
 }
 
 /* ======================================================
-   BID UI — FLOATING OVERLAY (bottom par)
+   BID UI — FLOATING (bottom par upar shift)
    ====================================================== */
 #bid-ui {
     position: fixed !important;
-    bottom: calc(100px + env(safe-area-inset-bottom, 0)) !important;
+    bottom: calc(180px + env(safe-area-inset-bottom, 0)) !important;
     left: 50% !important;
     top: auto !important;
     transform: translateX(-50%) !important;
@@ -622,7 +618,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .confetti { position: fixed; top: -20px; width: 8px; height: 14px; z-index: 9999; pointer-events: none; animation: confettiFall linear forwards; border-radius: 2px; }
 @keyframes confettiFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0.3; } }
 
-/* MOBILE */
+/* ======================================================
+   MOBILE
+   ====================================================== */
 @media (max-width: 400px) {
     .card { width: 40px; height: 56px; }
     .card .c-rank { font-size: 16px; }
@@ -640,11 +638,14 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     #trump-name-small { font-size: 9px; max-width: 50px; }
     .logo-icon-big { font-size: 44px; }
     .game-title { font-size: 26px; }
-    #bid-ui { bottom: calc(80px + env(safe-area-inset-bottom, 0)) !important; padding: 10px 12px; }
-    #my-area { padding-top: 30px; }
+    #bid-ui { bottom: calc(160px + env(safe-area-inset-bottom, 0)) !important; padding: 10px 12px; }
+    #my-area { padding-top: 60px; }
+    #player1-cards { min-height: 90px; }
 }
 
-/* LANDSCAPE */
+/* ======================================================
+   LANDSCAPE
+   ====================================================== */
 @media screen and (orientation: landscape) and (max-height: 550px) {
     .card { width: 34px; height: 48px; }
     .card .c-rank { font-size: 13px; }
@@ -655,11 +656,10 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     .player-avatar { font-size: 24px; }
     .my-avatar-inner, .my-avatar-wrap { width: 40px; height: 40px; }
     .icon-btn { width: 36px; height: 36px; }
-    #player1-cards { min-height: 62px; }
-    #messages { min-height: 26px; font-size: 12px; }
-    #bid-ui { bottom: calc(70px + env(safe-area-inset-bottom, 0)) !important; padding: 8px 12px; gap: 4px; }
+    #player1-cards { min-height: 70px; }
+    #bid-ui { bottom: calc(100px + env(safe-area-inset-bottom, 0)) !important; padding: 8px 12px; gap: 4px; }
     #bid-turn-info { font-size: 11px; padding: 3px 8px; }
     #bid-ui button { padding: 6px 8px; font-size: 12px; min-width: 34px; min-height: 32px; }
-    #my-area { padding-top: 10px; }
+    #my-area { padding-top: 20px; }
     #table { flex: 0.7; }
 }
