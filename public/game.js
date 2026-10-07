@@ -52,8 +52,8 @@ function openLobbyForm(mode) {
     const roomCodeGroup = $("room-code-group");
     const roomPassGroup = $("room-pass-group");
 
-    roomCodeGroup.classList.remove("hidden");
-    roomPassGroup.classList.remove("hidden");
+    SET roomCodeGroup.classList.remove("hidden");
+ —    roomPass BGroup.classList.remove("hidden");
 
     if (mode === "bot") {
         title.textContent = "🤖 Practice Mode";
@@ -88,9 +88,7 @@ $("join-btn").onclick = () => {
 
     if (CURRENT_MODE === "bot") {
         const botRoom = "bot_" + Date.now();
-        Sound.bid();
-        vibrate(30);
-        console.log("🤖 Starting bot game:", botRoom, name);
+        Sound.bid(); vibrate(30);
         socket.emit("startBotGame", { roomId: botRoom, playerName: name });
         return;
     }
@@ -178,7 +176,7 @@ socket.on("gameStart", data => {
     resetAllTricks();
     renderBidHistory(data.bidHistory);
 
-    // Reset trump indicator
+    // Reset trump
     $("trump-display").textContent = "-";
     $("trump-chooser-name").textContent = "";
     const tIcon = $("trump-icon");
@@ -196,6 +194,9 @@ socket.on("gameStart", data => {
     $("teammate-cards-list").innerHTML = "";
     clearActiveLeader();
     clearBidWinner();
+
+    // Hide bid UI — table khali
+    $("bid-ui").classList.remove("active");
 
     showMsg(data.phase === "warmup" ? "🔥 WARMUP — 5 cards" : "🃏 MAIN ROUND — 13 cards");
     Sound.deal();
@@ -246,24 +247,30 @@ $("pass-button-main").onclick = () => {
     Sound.pass(); vibrate(50); socket.emit("pass");
 };
 
+// BID UPDATE — TABLE KHALI RAKHNE KE LIYE
 socket.on("bidUpdate", data => {
     CURRENT_PHASE = data.phase;
     updatePhaseUI(data.phase);
     renderBidHistory(data.bidHistory);
+
+    const bidUi = $("bid-ui");
+
+    if (data.biddingActive && data.nextBidderId === MY_ID) {
+        // SIRF MERI BAARI MEIN SHOW
+        bidUi.classList.add("active");
+        $("bid-turn-info").textContent = "🎯 Tumhari baari";
+        enableBidButtons(true);
+        Sound.yourTurn();
+        vibrate([100, 50, 100]);
+    } else {
+        // WARNA HIDE — TABLE KHALI
+        bidUi.classList.remove("active");
+        enableBidButtons(false);
+    }
+
     if (data.biddingActive) {
-        if (data.nextBidderId === MY_ID) {
-            $("bid-turn-info").textContent = "🎯 Tumhari baari";
-            enableBidButtons(true);
-            Sound.yourTurn();
-            vibrate([100, 50, 100]);
-        } else {
-            $("bid-turn-info").textContent = `⏳ ${getPlayerName(data.nextBidderId)}`;
-            enableBidButtons(false);
-        }
         setActivePlayer(data.nextBidderId);
     } else {
-        enableBidButtons(false);
-        $("bid-turn-info").textContent = "";
         clearActivePlayer();
     }
 });
@@ -292,14 +299,13 @@ document.querySelectorAll("#trump-buttons button").forEach(b => {
     };
 });
 
+// TRUMPOT + HUMAN dono
 socket.on("trumpSet", data => {
     const chooserName = data.highestBidderName || getPlayerName(data.highestBidderId);
 
-    // Hidden legacy
     $("trump-display").textContent = data.trumpSuit;
     $("trump-chooser-name").textContent = chooserName ? `(${chooserName})` : "";
 
-    // Visible top bar
     const tIcon = $("trump-icon");
     const tName = $("trump-name-small");
     const tIndicator = $("trump-indicator");
@@ -345,15 +351,35 @@ $("toggle-reveal-btn").onclick = () => {
     Sound.bid(); vibrate(30);
 };
 
+// ROUND STARTED — TRUMP DISPLAY FIX (BOT KE LIYE BHI)
 socket.on("roundStarted", data => {
     CURRENT_PHASE = data.phase;
     updatePhaseUI(data.phase);
     renderHand(data.yourHand);
+
+    // TRUMP DISPLAY UPDATE
     $("trump-display").textContent = data.trumpSuit;
+
+    const tIcon = $("trump-icon");
+    const tName = $("trump-name-small");
+    const tIndicator = $("trump-indicator");
+
+    if (tIcon && data.trumpSuit) {
+        tIcon.textContent = data.trumpSuit;
+        if (tIndicator) tIndicator.classList.remove("empty");
+        if (tName && data.bidWinnerId) {
+            const name = PLAYER_NAMES[data.bidWinnerId] || `P${data.bidWinnerId}`;
+            tName.textContent = name.split(" ")[0];
+        }
+    }
+
     updatePlayerStats(data.handSizes);
     resetAllTricks();
     clearAllSlots();
     TEAMMATE_CARDS_VISIBLE = true;
+
+    // HIDE BID UI — TABLE KHALI
+    $("bid-ui").classList.remove("active");
 
     if (data.revealedHand && data.revealedHand.length > 0) {
         renderTeammateCards(data.revealedHand, data.revealedOwnerId);
