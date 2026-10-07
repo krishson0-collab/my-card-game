@@ -1,9 +1,18 @@
+/* ======================================================
+   GLOBAL
+   ====================================================== */
 * {
     box-sizing: border-box;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-user-select: none;
     user-select: none;
+}
+
+/* inputs me text select allow */
+input, textarea {
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 html, body {
@@ -15,6 +24,7 @@ html, body {
 
 .hidden { display: none !important; }
 button { font-family: inherit; cursor: pointer; border: none; outline: none; }
+button:focus-visible { outline: 2px solid #d4526e; outline-offset: 2px; }
 
 /* ======================================================
    LOBBY
@@ -27,9 +37,12 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
         radial-gradient(circle at 50% 85%, rgba(255, 210, 190, 0.5) 0%, transparent 55%),
         linear-gradient(160deg, #ffd9e0 0%, #f5c5d0 40%, #fce4d6 70%, #ffd9e0 100%);
     z-index: 100;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
 }
-.lobby-content { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; }
+.lobby-content {
+    width: 100%; max-width: 440px; margin: auto;
+    display: flex; flex-direction: column; gap: 16px;
+}
 
 .game-logo { text-align: center; padding: 4px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .logo-icon-big {
@@ -89,14 +102,11 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .mode-sub { color: #ffd9b0; font-size: 11px; font-weight: 600; text-align: center; }
 
 .spectate-btn {
-    padding: 14px 20px;
-    font-size: 16px;
-    font-weight: 900;
+    padding: 14px 20px; font-size: 16px; font-weight: 900;
     border-radius: 14px;
     background: linear-gradient(135deg, #4a9eff 0%, #2a6fd4 100%);
     color: #fff;
     border: 2px solid rgba(200, 220, 255, 0.5);
-    cursor: pointer;
     box-shadow: 0 6px 16px rgba(42, 111, 212, 0.35);
     transition: transform 0.15s;
 }
@@ -130,7 +140,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     color: #fff;
 }
 #players-list { display: none; }
-#players-list:not(:empty) { display: block; background: rgba(255, 250, 245, 0.95); padding: 14px 16px; border-radius: 20px; }
+#players-list.show { display: block; background: rgba(255, 250, 245, 0.95); padding: 14px 16px; border-radius: 20px; }
 #players-list h3 { margin: 0 0 10px 0; font-size: 14px; font-weight: 800; color: #8b3a2f; }
 #players-list > div { padding: 8px 12px; font-size: 13px; font-weight: 700; color: #4a2020; background: #fff; border-radius: 12px; margin-bottom: 6px; border: 1.5px solid #f0d8dc; }
 .lobby-footer { text-align: center; margin: 0; font-size: 12px; font-weight: 700; color: #b08090; }
@@ -151,6 +161,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
         linear-gradient(160deg, #ffd9e0 0%, #f5c5d0 40%, #fce4d6 70%, #ffd9e0 100%);
 }
 
+/* ======================================================
+   TOP BAR
+   ====================================================== */
 #top-bar {
     display: flex; justify-content: flex-start; align-items: flex-start;
     gap: 6px; z-index: 10; padding: 0 2px; flex-shrink: 0;
@@ -202,7 +215,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #reset-vote-btn.voted { box-shadow: 0 0 0 2px #4cc04c; }
 #reset-vote-btn.voted .icon-badge { background: #4cc04c; color: #fff; border-color: #2a8a2a; }
 
-/* TABLE */
+/* ======================================================
+   TABLE
+   ====================================================== */
 #table {
     position: relative; flex: 0.7; min-height: 0;
     display: grid;
@@ -212,30 +227,33 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
         ".        top      ."
         "left     center   right"
         ".        bottom   .";
-    gap: 4px; z-index: 1; padding: 4px;
+    gap: 4px;
+    z-index: 1;
+    padding: 4px;
 }
 
 .seat {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 4px; position: relative; min-height: 0; min-width: 0;
+    z-index: 1;   /* center se neeche */
 }
-.seat-top {
-    grid-area: top;
-    justify-content: flex-start;
-    padding-top: 0;
-    margin-top: -10px;
-}
-.seat-left { grid-area: left; align-items: flex-start; justify-content: center; }
-.seat-right { grid-area: right; align-items: flex-end; justify-content: center; }
+.seat-top    { grid-area: top; justify-content: flex-start; padding-top: 0; margin-top: -10px; }
+.seat-left   { grid-area: left; align-items: flex-start; justify-content: center; }
+.seat-right  { grid-area: right; align-items: flex-end; justify-content: center; }
 .seat-bottom { grid-area: bottom; justify-content: flex-end; }
 
-/* CENTER PLAYED CARDS */
+/* ======================================================
+   CENTER — PLAYED CARDS (CLEAN, NO OVERLAY)
+   ====================================================== */
 #played-cards-center {
     grid-area: center;
     position: relative;
     width: 100%;
     height: 100%;
-    min-height: 180px;
+    min-height: 200px;
+    z-index: 100;              /* table ke andar sabse upar */
+    isolation: isolate;        /* apna stacking context — bahar se kuch upar nahi aa sakta */
+    pointer-events: none;      /* card click-through seat pe na jaye (optional) */
 }
 
 .pc-slot {
@@ -244,34 +262,58 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     gap: 2px;
     align-items: center;
     justify-content: center;
-    z-index: 2;
+    z-index: 1;
+    pointer-events: none;
 }
 
-.pc-top { top: 5px; left: 50%; transform: translateX(-50%); }
+.pc-top    { top: 5px;    left: 50%; transform: translateX(-50%); }
 .pc-bottom { bottom: 5px; left: 50%; transform: translateX(-50%); }
-.pc-left { left: 5px; top: 50%; transform: translateY(-50%); }
-.pc-right { right: 5px; top: 50%; transform: translateY(-50%); }
+.pc-left   { left: 5px;   top: 50%;  transform: translateY(-50%); }
+.pc-right  { right: 5px;  top: 50%;  transform: translateY(-50%); }
 
 .pc-slot .card {
-    width: 42px !important;
-    height: 60px !important;
+    width: 48px !important;
+    height: 70px !important;
+    background: #ece4e0;
+    border: 1.5px solid #333;
+    border-radius: 7px;
+    box-shadow: 0 3px 7px rgba(0,0,0,0.4);
+    padding: 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    position: relative;
+    z-index: 2;
     animation: cardPop 0.25s ease-out;
+    pointer-events: auto;
 }
-.pc-slot .card .c-rank { font-size: 16px; }
-.pc-slot .card .c-suit { font-size: 18px; }
+.pc-slot .card .c-rank { font-size: 18px; font-weight: 900; line-height: 1; }
+.pc-slot .card .c-suit { font-size: 22px; line-height: 1; }
 
+@keyframes cardPop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+}
+
+/* ======================================================
+   PLAYER BADGES — z-index LOW so they don't cover center
+   ====================================================== */
 .player-badge {
     display: flex; align-items: center; gap: 5px;
     background: rgba(30, 15, 15, 0.85); color: #fff;
     padding: 4px 12px; border-radius: 20px;
     font-size: 12px; font-weight: 800;
     border: 1.5px solid rgba(255, 220, 180, 0.35);
-    white-space: nowrap; max-width: 100%; z-index: 5;
+    white-space: nowrap; max-width: 100%;
+    z-index: 1 !important;         /* center se neeche */
+    position: relative;
 }
 .pb-name { overflow: hidden; text-overflow: ellipsis; max-width: 75px; }
 .pb-suit { font-size: 12px; }
 
-.avatar-wrap { position: relative; width: 64px; height: 64px; }
+.avatar-wrap { position: relative; width: 64px; height: 64px; z-index: 1; }
 .player-avatar {
     width: 64px; height: 64px; border-radius: 50%;
     background: #fff; display: flex; align-items: center; justify-content: center;
@@ -306,7 +348,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 }
 @keyframes pulseAvatar {
     0%, 100% { box-shadow: 0 0 0 3px #ffd966, 0 0 18px 3px rgba(255, 217, 102, 0.7); }
-    50% { box-shadow: 0 0 0 4px #ffd966, 0 0 28px 6px rgba(255, 217, 102, 0.95); }
+    50%      { box-shadow: 0 0 0 4px #ffd966, 0 0 28px 6px rgba(255, 217, 102, 0.95); }
 }
 .seat.leader .avatar-wrap::after {
     content: "⭐"; position: absolute; top: -8px; right: -8px;
@@ -319,7 +361,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     filter: drop-shadow(0 0 6px gold);
 }
 
-/* CARDS */
+/* ======================================================
+   CARDS (generic)
+   ====================================================== */
 .card {
     width: 42px; height: 60px;
     background: #fff; border-radius: 6px;
@@ -328,25 +372,22 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     color: #000; font-weight: bold; line-height: 1;
     flex-shrink: 0; padding: 2px; gap: 1px;
+    position: relative;   /* ← z-index fix */
 }
 .card.red { color: #d00; }
 .card.black { color: #111; }
 .card .c-rank { font-size: 18px; font-weight: 900; line-height: 1; }
 .card .c-suit { font-size: 20px; line-height: 1; }
 
-@keyframes cardPop {
-    0% { transform: scale(0.6); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-/* MY AREA */
+/* ======================================================
+   MY AREA
+   ====================================================== */
 #my-area {
     position: relative; z-index: 5; padding: 0 6px;
     display: flex; flex-direction: column; gap: 2px;
     margin-top: auto; padding-top: 20px;
 }
 
-/* MY PROFILE — RIGHT SIDE */
 #my-avatar-row {
     display: flex; align-items: flex-end;
     justify-content: flex-end;
@@ -394,6 +435,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     background: rgba(255, 250, 245, 0.6);
     border-radius: 16px;
     -webkit-overflow-scrolling: touch;
+    z-index: 5;
 }
 #player1-cards::-webkit-scrollbar { display: none; }
 #player1-cards .card {
@@ -402,6 +444,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     margin-left: -10px;
     box-shadow: -1px 0 4px rgba(120, 40, 60, 0.15);
     transition: transform 0.15s;
+    position: relative;
     z-index: 1;
 }
 #player1-cards .card:first-child { margin-left: 0; }
@@ -413,15 +456,18 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #player1-cards .card .c-rank { font-size: 19px; }
 #player1-cards .card .c-suit { font-size: 21px; }
 
-#messages { display: none !important; }
+#messages { display: none; }
 
-/* TEAMMATE CARDS */
+/* ======================================================
+  Y TEAMMATE( CARDS
+   =====================================================0= */
 #teammate-cards {
     margin: 0 0 6px 0; padding: 6px 8px;
     background: rgba(255, 250, 245, 0.95);
     border: 2px solid #d4a850; border-radius: 12px;
     text-align: center; flex-shrink: 0;
     max-height: none; overflow: visible;
+    z-index: 5;
 }
 #teammate-cards .tc-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -454,28 +500,30 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #teammate-cards-list .card .c-rank { font-size: 10px; }
 #teammate-cards-list .card .c-suit { font-size: 12px; }
 
-/* BID UI — TOP */
+/* ======================================================
+   BID UI — z-index LOW so it never covers center
+   ====================================================== */
 #bid-ui {
     position: fixed !important;
-    top: calc(70px + env(safe-area-inset-top, 0)) !important;
-    bottom: auto !important;
+    top: auto !important;
+    bottom: calc(180px + env(safe-area-inset-bottom, 0)) !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    display: none !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 6px !important;
-    z-index: 999 !important;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 90 !important;    /* center (100) se neeche */
     background: linear-gradient(160deg, #fdf5e6 0%, #fce4d6 100%);
     padding: 12px 16px; border-radius: 20px;
     border: 3px solid #d4a850;
     box-shadow: 0 12px 32px rgba(139, 37, 56, 0.5);
     max-width: 95vw;
 }
-#bid-ui.active { display: flex !important; animation: bidPop 0.3s ease-out; }
+#bid-ui.active { display: flex; animation: bidPop 0.3s ease-out; }
 @keyframes bidPop {
     from { transform: translateX(-50%) scale(0.85); opacity: 0; }
-    to { transform: translateX(-50%) scale(1); opacity: 1; }
+    to   { transform: translateX(-50%) scale(1);    opacity: 1; }
 }
 #bid-turn-info {
     color: #8b2538; font-weight: 900; font-size: 13px;
@@ -505,20 +553,16 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     color: #fff !important; min-width: 56px !important; font-size: 13px !important;
 }
 
-/* MODALS — NO BLUR */
-#trump-panel {
+/* ======================================================
+   MODALS
+   ====================================================== */
+#trump-panel, #reveal-panel {
     position: fixed; inset: 0;
     background: rgba(60, 20, 30, 0.35) !important;
     display: flex; align-items: center; justify-content: center;
     z-index: 2000; padding: 20px;
-    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
-}
-#reveal-panel {
-    position: fixed; inset: 0;
-    background: rgba(60, 20, 30, 0.35) !important;
-    display: flex; align-items: center; justify-content: center;
-    z-index: 2000; padding: 20px;
-    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 }
 #game-over-panel, #leave-confirm-panel {
     position: fixed; inset: 0;
@@ -562,7 +606,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .confetti { position: fixed; top: -20px; width: 8px; height: 14px; z-index: 9999; pointer-events: none; animation: confettiFall linear forwards; border-radius: 2px; }
 @keyframes confettiFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0.3; } }
 
-/* HISTORY PANEL */
+/* ======================================================
+   HISTORY PANEL
+   ====================================================== */
 #history-overlay { position: fixed; inset: 0; background: rgba(60, 20, 30, 0.55); z-index: 998; }
 #history-panel {
     position: fixed; left: 0; right: 0; bottom: 0;
@@ -593,7 +639,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .history-text { line-height: 1.3; }
 .history-scores { color: #b03a52; font-size: 11px; margin-top: 3px; font-weight: 700; }
 
-/* SETTINGS */
+/* ======================================================
+   SETTINGS
+   ====================================================== */
 #settings-panel {
     position: fixed; inset: 0; background: rgba(60, 20, 30, 0.75);
     display: flex; align-items: center; justify-content: center;
@@ -619,34 +667,50 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .si-arrow { font-size: 16px; color: #b08090; font-weight: 800; }
 .settings-footer { margin: 14px 0 0 0; text-align: center; font-size: 11px; color: #b08090; font-weight: 700; }
 
-/* SPECTATOR MODE */
+/* ======================================================
+   SPECTATOR MODE
+   ====================================================== */
 body.spectator-mode #my-area { display: none !important; }
 body.spectator-mode #bid-ui { display: none !important; }
 
 #spectator-banner {
     position: fixed;
     top: calc(70px + env(safe-area-inset-top, 0));
-    left: 50%;
-    transform: translateX(-50%);
+    left: 50%; transform: translateX(-50%);
     background: linear-gradient(135deg, #4a9eff 0%, #2a6fd4 100%);
     color: #fff;
-    padding: 6px 16px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 800;
-    z-index: 500;
+    padding: 6px 16px; border-radius: 12px;
+    font-size: 12px; font-weight: 800;
+    z-index: 90 !important;   /* center se neeche */
     border: 2px solid rgba(200, 220, 255, 0.5);
     box-shadow: 0 6px 16px rgba(42, 111, 212, 0.4);
     white-space: nowrap;
 }
 
-/* MOBILE */
+/* ======================================================
+   AUTO-HIDE modals when NOT active
+   ====================================================== */
+#trump-panel:not(.active),
+#reveal-panel:not(.active),
+#game-over-panel:not(.active),
+#leave-confirm-panel:not(.active),
+#settings-panel:not(.active),
+#history-panel:not(.active),
+#history-overlay:not(.active) {
+    display: none !important;
+}
+
+/* ======================================================
+   MOBILE
+   ====================================================== */
 @media (max-width: 400px) {
     .card { width: 40px; height: 56px; }
     .card .c-rank { font-size: 16px; }
     .card .c-suit { font-size: 18px; }
-    .pc-slot .card { width: 34px !important; height: 48px !important; }
-    #played-cards-center { min-height: 130px; }
+    .pc-slot .card { width: 40px !important; height: 58px !important; }
+    .pc-slot .card .c-rank { font-size: 15px; }
+    .pc-slot .card .c-suit { font-size: 18px; }
+    #played-cards-center { min-height: 150px; }
     #player1-cards .card { width: 42px; height: 60px; margin-left: -12px; }
     .player-avatar, .avatar-wrap { width: 56px; height: 56px; }
     .player-avatar { font-size: 28px; }
@@ -659,7 +723,7 @@ body.spectator-mode #bid-ui { display: none !important; }
     #trump-name-small { font-size: 9px; max-width: 50px; }
     .logo-icon-big { font-size: 44px; }
     .game-title { font-size: 26px; }
-    #bid-ui { top: calc(60px + env(safe-area-inset-top, 0)) !important; padding: 10px 12px; }
+    #bid-ui { bottom: calc(150px + env(safe-area-inset-bottom, 0)) !important; padding: 10px 12px; }
     #my-area { padding-top: 12px; }
     #player1-cards { min-height: 90px; }
     #teammate-cards-list .card { width: 22px; height: 32px; margin-left: -3px; }
@@ -669,18 +733,22 @@ body.spectator-mode #bid-ui { display: none !important; }
     #my-avatar-row { padding-right: 6px; }
 }
 
-/* LANDSCAPE */
+/* ======================================================
+   LANDSCAPE
+   ====================================================== */
 @media screen and (orientation: landscape) and (max-height: 550px) {
     .card { width: 34px; height: 48px; }
-    .pc-slot .card { width: 32px !important; height: 46px !important; }
-    #played-cards-center { min-height: 110px; }
+    .pc-slot .card { width: 36px !important; height: 52px !important; }
+    .pc-slot .card .c-rank { font-size: 14px; }
+    .pc-slot .card .c-suit { font-size: 16px; }
+    #played-cards-center { min-height: 120px; }
     #player1-cards .card { width: 38px; height: 54px; }
     .player-avatar, .avatar-wrap { width: 46px; height: 46px; }
     .player-avatar { font-size: 24px; }
     .my-avatar-inner, .my-avatar-wrap { width: 40px; height: 40px; }
     .icon-btn { width: 36px; height: 36px; }
     #player1-cards { min-height: 70px; }
-    #bid-ui { top: calc(55px + env(safe-area-inset-top, 0)) !important; padding: 8px 12px; gap: 4px; }
+    #bid-ui { bottom: calc(130px + env(safe-area-inset-bottom, 0)) !important; padding: 8px 12px; gap: 4px; }
     #bid-turn-info { font-size: 11px; padding: 3px 8px; }
     #bid-ui button { padding: 6px 8px; font-size: 12px; min-width: 34px; min-height: 32px; }
     #my-area { padding-top: 6px; }
