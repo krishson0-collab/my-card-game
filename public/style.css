@@ -315,10 +315,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     border: 1px solid #222;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #000%; font-weight:);
- bold; line-height}
-: 1;
-#    flex-shrink: 0; paddingte: 2px;amm gap: 1px;
+    color: #000; font-weight: bold; line-height: 1;
+    flex-shrink: 0; padding: 2px; gap: 1px;
 }
 .card.red { color: #d00; }
 .card.black { color: #111; }
@@ -438,7 +436,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     cursor: pointer; white-space: nowrap; font-family: inherit;
 }
 #teammate-cards .toggle-reveal-btn.hidden-state {
-    background: linear-gradient(135deg, #4cc04c 0%, #2a8a2a 100ate-cards-list {
+    background: linear-gradient(135deg, #4cc04c 0%, #2a8a2a 100%);
+}
+#teammate-cards-list {
     display: flex;
     gap: 1px;
     justify-content: center;
