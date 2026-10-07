@@ -80,7 +80,6 @@
         </div>
 
         <div id="players-list"></div>
-
         <p class="lobby-footer">🎴 4 players • 2 teams • 52 cards</p>
     </div>
 </div>
@@ -88,71 +87,51 @@
 <!-- GAME -->
 <div id="game" class="hidden">
 
-    <!-- TOP BAR -->
-    <div id="top-bar">
-        <div class="round-badge">
-            <div class="rb-icon">📋</div>
-            <div class="rb-text">
-                <div class="rb-label">Round</div>
-                <div class="rb-value"><span id="round-counter">1/5</span></div>
-            </div>
-        </div>
+    <!-- TOP RIGHT BUTTONS -->
+    <div id="top-right-buttons">
+        <button class="trb" id="sound-fab" title="Sound">🔊</button>
+        <button class="trb" id="reset-vote-btn" title="Vote Reset">
+            🔄<span class="trb-badge" id="reset-vote-badge">0</span>
+        </button>
+        <button class="trb" id="history-btn" title="History">📋</button>
+        <button class="trb" id="leave-fab" title="Exit">🚪</button>
+    </div>
 
-        <div class="top-right-icons">
-            <div class="icon-btn">
-                <span class="icon-emoji">🔀</span>
-                <span class="icon-badge">2</span>
-            </div>
-            <div class="icon-btn">
-                <span class="icon-emoji">↩️</span>
-                <span class="icon-badge">2</span>
-            </div>
-            <div class="icon-btn">
-                <span class="icon-emoji">🕐</span>
-                <span class="icon-badge">3</span>
-            </div>
-            <div class="icon-btn">
-                <span class="icon-emoji">⚙️</span>
-            </div>
+    <!-- ROUND BADGE (top-left) -->
+    <div class="round-badge">
+        <div class="rb-icon">📋</div>
+        <div class="rb-text">
+            <div class="rb-label">Round</div>
+            <div class="rb-value"><span id="round-counter">1/5</span></div>
         </div>
     </div>
 
-    <!-- HIDDEN HEADER (game.js needs) -->
-    <div id="header" style="display:none">
+    <!-- HIDDEN LEGACY -->
+    <div style="display:none">
         <span id="room-display">-</span>
         <span id="trump-display">-</span>
         <span id="trump-chooser-name"></span>
         <span id="phase-display">WARMUP</span>
-    </div>
-
-    <!-- HIDDEN SCORE (game.js needs) -->
-    <div id="score-strip" style="display:none">
         <span id="team-a-score">0</span>
         <span id="team-b-score">0</span>
-        <button id="vote-reset-btn">Reset</button>
+        <span id="you-display">-</span>
+        <span id="current-bid">4</span>
         <span id="reset-vote-info">0/4</span>
     </div>
 
     <!-- TABLE -->
     <div id="table">
 
-        <!-- TOP PLAYER -->
+        <!-- TOP PLAYER (teammate) -->
         <div class="seat seat-top" id="seat-top">
             <div class="player-badge">
                 <span class="pb-name" id="top-name">-</span>
                 <span class="pb-suit">♠️</span>
             </div>
-            <div class="player-avatar-wrap">
-                <div class="avatar-fan">
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                </div>
+            <div class="avatar-wrap">
+                <div class="avatar-fan"><span class="fan-card"></span><span class="fan-card"></span><span class="fan-card"></span></div>
                 <div class="player-avatar" id="top-avatar">🤖</div>
-                <div class="score-badge">
-                    <span id="top-tricks">0</span>/<span id="top-count">5</span>
-                </div>
+                <div class="score-badge"><span id="top-tricks">0</span>/<span id="top-count">5</span></div>
             </div>
             <div class="played-slot" id="slot-top"></div>
         </div>
@@ -163,17 +142,10 @@
                 <span class="pb-name" id="left-name">-</span>
                 <span class="pb-suit">♠️</span>
             </div>
-            <div class="player-avatar-wrap">
-                <div class="avatar-fan">
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                </div>
+            <div class="avatar-wrap">
+                <div class="avatar-fan"><span class="fan-card"></span><span class="fan-card"></span><span class="fan-card"></span></div>
                 <div class="player-avatar" id="left-avatar">🤖</div>
-                <div class="score-badge">
-                    <span id="left-tricks">0</span>/<span id="left-count">5</span>
-                </div>
+                <div class="score-badge"><span id="left-tricks">0</span>/<span id="left-count">5</span></div>
             </div>
             <div class="played-slot" id="slot-left"></div>
         </div>
@@ -184,61 +156,49 @@
                 <span class="pb-name" id="right-name">-</span>
                 <span class="pb-suit">♠️</span>
             </div>
-            <div class="player-avatar-wrap">
-                <div class="avatar-fan">
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                </div>
+            <div class="avatar-wrap">
+                <div class="avatar-fan"><span class="fan-card"></span><span class="fan-card"></span><span class="fan-card"></span></div>
                 <div class="player-avatar" id="right-avatar">🤖</div>
-                <div class="score-badge">
-                    <span id="right-tricks">0</span>/<span id="right-count">5</span>
-                </div>
+                <div class="score-badge"><span id="right-tricks">0</span>/<span id="right-count">5</span></div>
             </div>
             <div class="played-slot" id="slot-right"></div>
         </div>
 
-        <!-- BOTTOM -->
-        <div class="seat seat-bottom" id="seat-bottom">
+        <!-- CENTER -->
+        <div class="seat seat-center">
             <div class="played-slot" id="slot-bottom"></div>
         </div>
 
     </div>
 
-    <!-- TEAMMATE REVEALED -->
+    <!-- TEAMMATE HIDE TOGGLE BUTTON -->
+    <button id="toggle-reveal-btn" class="toggle-reveal-btn hidden">🙈 Hide</button>
+
+    <!-- TEAMMATE REVEALED CARDS -->
     <div id="teammate-cards" class="hidden">
         <h4>👀 Partner — <span id="revealed-owner">?</span></h4>
         <div id="teammate-cards-list"></div>
     </div>
 
-    <!-- MY AVATAR + HAND -->
+    <!-- MY CARDS -->
     <div id="my-area">
         <div id="my-avatar-row">
             <div class="my-avatar-wrap">
-                <div class="avatar-fan my-fan">
-                    <span class="fan-card"></span>
-                    <span class="fan-card"></span>
-                </div>
+                <div class="avatar-fan my-fan"><span class="fan-card"></span><span class="fan-card"></span></div>
                 <div class="my-avatar-inner">🧑</div>
             </div>
             <div class="my-name-badge">
                 <span class="pb-suit">♠️</span>
                 <span id="bottom-name">You</span>
                 <span class="my-score"><span id="bottom-tricks">0</span></span>
-                <span class="my-coin">
-                    <span class="coin-icon-small">💎</span>
-                    <span>100</span>
-                </span>
+                <span class="my-coin"><span class="coin-icon-small">💎</span><span>100</span></span>
             </div>
         </div>
         <div id="player1-cards"></div>
     </div>
 
     <!-- MESSAGE -->
-    <div id="messages">
-        <div id="game-message">Waiting...</div>
-    </div>
+    <div id="messages"><div id="game-message">Waiting...</div></div>
 
     <!-- BID UI -->
     <div id="bid-ui">
@@ -258,29 +218,42 @@
         </div>
     </div>
 
-    <button id="history-fab" title="History">📋</button>
-    <button id="sound-fab" title="Sound">🔊</button>
-    <button id="leave-fab" title="Leave Room">🚪</button>
-
     <!-- HISTORY -->
     <div id="history-overlay" class="hidden"></div>
     <div id="history-panel" class="hidden">
         <div class="drag-bar"></div>
-        <div id="history-header">
-            <h3>📋 History</h3>
-            <button id="close-history-btn">✕</button>
-        </div>
+        <div id="history-header"><h3>📋 History</h3><button id="close-history-btn">✕</button></div>
         <div id="history-content">
-            <div id="bid-history-panel">
-                <h4>💰 Bids</h4>
-                <div id="bid-history-list">
-                    <div class="bid-empty">No bids yet...</div>
-                </div>
+            <div id="bid-history-panel"><h4>💰 Bids</h4><div id="bid-history-list"><div class="bid-empty">No bids yet...</div></div></div>
+            <div id="round-history"><h4>🎴 Rounds</h4><div id="round-history-list"></div></div>
+        </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="settings-panel" class="hidden">
+        <div class="settings-box">
+            <div class="settings-header">
+                <h3>⚙️ Settings</h3>
+                <button id="close-settings-btn" class="settings-close">✕</button>
             </div>
-            <div id="round-history">
-                <h4>🎴 Rounds</h4>
-                <div id="round-history-list"></div>
+            <div class="settings-menu">
+                <button class="settings-item" id="settings-sound">
+                    <span class="si-icon">🔊</span>
+                    <span class="si-label">Sound</span>
+                    <span class="si-value" id="sound-status">On</span>
+                </button>
+                <button class="settings-item" id="settings-history">
+                    <span class="si-icon">📋</span>
+                    <span class="si-label">History</span>
+                    <span class="si-arrow">→</span>
+                </button>
+                <button class="settings-item danger" id="settings-leave">
+                    <span class="si-icon">🚪</span>
+                    <span class="si-label">Leave Room</span>
+                    <span class="si-arrow">→</span>
+                </button>
             </div>
+            <p class="settings-footer">Card Game v1.0</p>
         </div>
     </div>
 
@@ -302,10 +275,7 @@
         <div class="reveal-box">
             <h3>Partner ke cards dikhane hain?</h3>
             <p>Bid 9+ hai. Haan bologe toh <b>sab dekhenge</b>.</p>
-            <div>
-                <button id="reveal-yes">Haan</button>
-                <button id="reveal-no">Nahi</button>
-            </div>
+            <div><button id="reveal-yes">Haan</button><button id="reveal-no">Nahi</button></div>
         </div>
     </div>
 
@@ -316,36 +286,21 @@
             <h1>GAME OVER</h1>
             <h2 id="winner-team">Team A Wins!</h2>
             <div class="final-scores">
-                <div class="score-row" id="final-row-a">
-                    <span class="team-label">Team A</span>
-                    <span class="team-score" id="final-team-a">0</span>
-                </div>
-                <div class="score-row" id="final-row-b">
-                    <span class="team-label">Team B</span>
-                    <span class="team-score" id="final-team-b">0</span>
-                </div>
+                <div class="score-row" id="final-row-a"><span class="team-label">Team A</span><span class="team-score" id="final-team-a">0</span></div>
+                <div class="score-row" id="final-row-b"><span class="team-label">Team B</span><span class="team-score" id="final-team-b">0</span></div>
             </div>
             <div class="result-message" id="result-message"></div>
             <button id="close-result-btn">👍 OK</button>
         </div>
     </div>
 
-    <!-- LEAVE -->
+    <!-- LEAVE CONFIRM -->
     <div id="leave-confirm-panel" class="hidden">
         <div class="leave-box">
             <h3>🚪 Room chhodna hai?</h3>
             <p>Aap game se bahar nikal jaoge.</p>
-            <div>
-                <button id="leave-confirm-yes">Haan</button>
-                <button id="leave-confirm-no">Nahi</button>
-            </div>
+            <div><button id="leave-confirm-yes">Haan</button><button id="leave-confirm-no">Nahi</button></div>
         </div>
-    </div>
-
-    <!-- HIDDEN LEGACY -->
-    <div style="display:none">
-        <span id="you-display">-</span>
-        <span id="current-bid">4</span>
     </div>
 
 </div>
