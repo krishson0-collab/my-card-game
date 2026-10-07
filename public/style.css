@@ -224,7 +224,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 
 /* TABLE */
 #table {
-    position: relative; flex: 0.75; min-height: 0;
+    position: relative; flex: 0.7; min-height: 0;
     display: grid;
     grid-template-columns: 1fr 1.3fr 1fr;
     grid-template-rows: 1fr 1.4fr 1fr;
@@ -315,8 +315,10 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     border: 1px solid #222;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #000; font-weight: bold; line-height: 1;
-    flex-shrink: 0; padding: 2px; gap: 1px;
+    color: #000%; font-weight:);
+ bold; line-height}
+: 1;
+#    flex-shrink: 0; paddingte: 2px;amm gap: 1px;
 }
 .card.red { color: #d00; }
 .card.black { color: #111; }
@@ -406,17 +408,19 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     display: none !important;
 }
 
-/* TEAMMATE CARDS — above player cards */
+/* ======================================================
+   TEAMMATE CARDS — POORE DIKHEIN (wrap + chhote)
+   ====================================================== */
 #teammate-cards {
     margin: 0 0 6px 0;
-    max-height: 70px;
-    padding: 4px 8px;
+    padding: 6px 8px;
     background: rgba(255, 250, 245, 0.95);
     border: 2px solid #d4a850;
     border-radius: 12px;
     text-align: center;
     flex-shrink: 0;
-    overflow: hidden;
+    max-height: none;
+    overflow: visible;
 }
 #teammate-cards .tc-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -434,17 +438,29 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     cursor: pointer; white-space: nowrap; font-family: inherit;
 }
 #teammate-cards .toggle-reveal-btn.hidden-state {
-    background: linear-gradient(135deg, #4cc04c 0%, #2a8a2a 100%);
+    background: linear-gradient(135deg, #4cc04c 0%, #2a8a2a 100ate-cards-list {
+    display: flex;
+    gap: 1px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;              /* ✅ wrap — sab dikhenge */
+    overflow: visible;
 }
-#teammate-cards-list {
-    display: flex; gap: 3px; justify-content: center;
-    flex-wrap: nowrap; overflow-x: auto;
+#teammate-cards-list .card {
+    width: 24px;
+    height: 36px;
+    margin-left: -4px;
+    flex-shrink: 0;
+    padding: 1px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
-#teammate-cards-list .card { width: 32px; height: 46px; }
-#teammate-cards-list .card .c-rank { font-size: 13px; }
-#teammate-cards-list .card .c-suit { font-size: 15px; }
+#teammate-cards-list .card:first-child { margin-left: 0; }
+#teammate-cards-list .card .c-rank { font-size: 10px; }
+#teammate-cards-list .card .c-suit { font-size: 12px; }
 
-/* BID UI — FLOATING */
+/* ======================================================
+   BID UI — FLOATING
+   ====================================================== */
 #bid-ui {
     position: fixed !important;
     bottom: calc(180px + env(safe-area-inset-bottom, 0)) !important;
@@ -507,7 +523,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 }
 
 /* ======================================================
-   MODALS — NO BLUR (cards visible behind)
+   MODALS — NO BLUR
    ====================================================== */
 #trump-panel {
     position: fixed; inset: 0;
@@ -660,7 +676,13 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     #bid-ui { bottom: calc(160px + env(safe-area-inset-bottom, 0)) !important; padding: 10px 12px; }
     #my-area { padding-top: 12px; }
     #player1-cards { min-height: 90px; }
-    #teammate-cards { max-height: 60px; padding: 3px 6px; }
+    #teammate-cards-list .card {
+        width: 22px;
+        height: 32px;
+        margin-left: -3px;
+    }
+    #teammate-cards-list .card .c-rank { font-size: 9px; }
+    #teammate-cards-list .card .c-suit { font-size: 11px; }
 }
 
 /* LANDSCAPE */
@@ -679,6 +701,12 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     #bid-turn-info { font-size: 11px; padding: 3px 8px; }
     #bid-ui button { padding: 6px 8px; font-size: 12px; min-width: 34px; min-height: 32px; }
     #my-area { padding-top: 6px; }
-    #table { flex: 0.7; }
-    #teammate-cards { max-height: 50px; }
+    #table { flex: 0.6; }
+    #teammate-cards-list .card {
+        width: 20px;
+        height: 30px;
+        margin-left: -2px;
+    }
+    #teammate-cards-list .card .c-rank { font-size: 8px; }
+    #teammate-cards-list .card .c-suit { font-size: 10px; }
 }
