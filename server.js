@@ -464,10 +464,12 @@ function broadcastRevealedHandUpdate(room) {
     if (!room.teammateRevealed) return;
     if (room.highestBidder === null || room.highestBidder === undefined) return;
     if (!room.players || !room.players[room.highestBidder]) return;
+
     const bidderId = room.players[room.highestBidder].id;
     const mateId = TEAMMATES[bidderId];
     if (!mateId) return;
     if (!room.players[mateId - 1]) return;
+
     try {
         io.to(room.id).emit("revealedHandUpdate", {
             revealedHand: room.players[mateId - 1].hand,
@@ -614,6 +616,14 @@ function botPlay(room, bot) {
         if (res2.error) return;
     }
 
+    // ✅ FIX: Revealed teammate hand update (bot ke liye bhi)
+    if (room.teammateRevealed && room.highestBidder !== null && room.players[room.highestBidder]) {
+        const mateId = TEAMMATES[room.players[room.highestBidder].id];
+        if (mateId && bot.id === mateId) {
+            broadcastRevealedHandUpdate(room);
+        }
+    }
+
     io.to(room.id).emit("cardPlayed", {
         playerId: bot.id,
         playerName: bot.name,
@@ -634,14 +644,20 @@ function botPlay(room, bot) {
                 warmupFailed: !!r.warmupFailed,
                 players: room.players.map(p => ({ id: p.id, tricks: p.tricks, handSize: p.hand.length }))
             });
+
             if (r.roundEnd) {
                 if (room.phase === PHASE_WARMUP) {
                     const result = finishWarmup(room);
                     io.to(room.id).emit("roundEnd", result);
+
                     if (room.teamAScore >= WIN_SCORE || room.teamBScore >= WIN_SCORE) {
                         const winner = room.teamAScore >= WIN_SCORE ? "A" : "B";
                         room.gameEnded = winner;
-                        io.to(room.id).emit("gameOver", { winner, teamAScore: room.teamAScore, teamBScore: room.teamBScore });
+                        io.to(room.id).emit("gameOver", {
+                            winner,
+                            teamAScore: room.teamAScore,
+                            teamBScore: room.teamBScore
+                        });
                     } else {
                         setTimeout(() => {
                             dealWarmup(room);
@@ -654,7 +670,11 @@ function botPlay(room, bot) {
                     const result = finishMain(room);
                     io.to(room.id).emit("roundEnd", result);
                     if (room.gameEnded) {
-                        io.to(room.id).emit("gameOver", { winner: room.gameEnded, teamAScore: room.teamAScore, teamBScore: room.teamBScore });
+                        io.to(room.id).emit("gameOver", {
+                            winner: room.gameEnded,
+                            teamAScore: room.teamAScore,
+                            teamBScore: room.teamBScore
+                        });
                     } else {
                         setTimeout(() => {
                             dealWarmup(room);
@@ -664,15 +684,20 @@ function botPlay(room, bot) {
                         }, 4000);
                     }
                 }
-            } else scheduleBotAction(room);
+            } else {
+                setTimeout(() => scheduleBotAction(room), 600);
+            }
         }, 1200);
-    } else scheduleBotAction(room);
+    } else {
+        setTimeout(() => scheduleBotAction(room), 600);
+    }
 }
 
 // ======================================================
 // SOCKET
 // ======================================================
 io.on("connection", socket => {
+
     // JOIN ROOM
     socket.on("joinRoom", ({ roomId, playerName, password }) => {
         if (rooms[roomId]) {
@@ -714,7 +739,7 @@ io.on("connection", socket => {
     });
 
     // ======================================================
-    // START BOT GAME — DIRECT 13 CARDS (no warmup)
+    // START BOT GAME — DIRECT 13 CARDS
     // ======================================================
     socket.on("startBotGame", ({ roomId, playerName }) => {
         console.log(`🤖 Bot game request: room=${roomId}, name=${playerName}`);
@@ -752,7 +777,7 @@ io.on("connection", socket => {
             }))
         });
 
-        // ✅ DIRECT 13 CARDS (no warmup)
+        // DIRECT 13 CARDS — no warmup
         dealMainFresh(room);
         sendGameStart(room);
         sendBidUpdate(room);
@@ -769,6 +794,7 @@ io.on("connection", socket => {
         const res = handleBid(room, socket.data.playerId, bid);
         if (res.error) return socket.emit("errorMsg", res.error);
         sendBidUpdate(room);
+
         if (!room.biddingActive) {
             io.to(room.id).emit("biddingFinished", {
                 highestBid: room.highestBid,
@@ -787,6 +813,7 @@ io.on("connection", socket => {
         const res = handlePass(room, socket.data.playerId);
         if (res.error) return socket.emit("errorMsg", res.error);
         sendBidUpdate(room);
+
         if (!room.biddingActive) {
             if (room.phase === PHASE_WARMUP && room.warmupAllPassed) {
                 io.to(room.id).emit("warmupSkipped", {});
@@ -814,24 +841,27 @@ io.on("connection", socket => {
         if (!room) return;
         const res = handleTrump(room, socket.data.playerId, suit);
         if (res.error) return socket.emit("errorMsg", res.error);
+
         io.to(room.id).emit("trumpSet", {
             trumpSuit: suit,
             waitReveal: !!res.waitReveal,
             highestBidderId: room.players[room.highestBidder].id,
             highestBidderName: room.players[room.highestBidder].name
         });
+
         if (!res.waitReveal) {
             broadcastRoundStart(room);
             setTimeout(() => scheduleBotAction(room), 800);
         }
     });
 
-    // REVEAL
+    // REVEAL DECISION
     socket.on("revealDecision", ({ decision }) => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const res = handleRevealDecision(room, socket.data.playerId, decision);
         if (res.error) return socket.emit("errorMsg", res.error);
+
         io.to(room.id).emit("teammateRevealed", { revealed: room.teammateRevealed });
         broadcastRoundStart(room);
         setTimeout(() => scheduleBotAction(room), 800);
@@ -844,8 +874,10 @@ io.on("connection", socket => {
         const pid = socket.data.playerId;
         if (room.highestBidder === null || room.highestBidder === undefined) return;
         if (room.highestBidder !== pid - 1) return;
+
         room.teammateRevealed = !room.teammateRevealed;
         room.revealDecision = room.teammateRevealed ? "show" : "hide";
+
         io.to(room.id).emit("teammateRevealed", { revealed: room.teammateRevealed });
         if (room.teammateRevealed) broadcastRevealedHandUpdate(room);
     });
@@ -863,7 +895,12 @@ io.on("connection", socket => {
             io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
         }
 
-        if (room.teammateRevealed && room.highestBidder !== null && room.highestBidder !== undefined && room.players[room.highestBidder]) {
+        if (
+            room.teammateRevealed &&
+            room.highestBidder !== null &&
+            room.highestBidder !== undefined &&
+            room.players[room.highestBidder]
+        ) {
             const mateId = TEAMMATES[room.players[room.highestBidder].id];
             if (mateId && pid === mateId) broadcastRevealedHandUpdate(room);
         }
@@ -888,6 +925,7 @@ io.on("connection", socket => {
                     warmupFailed: !!r.warmupFailed,
                     players: room.players.map(p => ({ id: p.id, tricks: p.tricks, handSize: p.hand.length }))
                 });
+
                 if (r.roundEnd) {
                     if (room.phase === PHASE_WARMUP) {
                         const result = finishWarmup(room);
@@ -895,7 +933,9 @@ io.on("connection", socket => {
                         if (room.teamAScore >= WIN_SCORE || room.teamBScore >= WIN_SCORE) {
                             const winner = room.teamAScore >= WIN_SCORE ? "A" : "B";
                             room.gameEnded = winner;
-                            io.to(room.id).emit("gameOver", { winner, teamAScore: room.teamAScore, teamBScore: room.teamBScore });
+                            io.to(room.id).emit("gameOver", {
+                                winner, teamAScore: room.teamAScore, teamBScore: room.teamBScore
+                            });
                         } else {
                             setTimeout(() => {
                                 dealWarmup(room);
@@ -908,7 +948,9 @@ io.on("connection", socket => {
                         const result = finishMain(room);
                         io.to(room.id).emit("roundEnd", result);
                         if (room.gameEnded) {
-                            io.to(room.id).emit("gameOver", { winner: room.gameEnded, teamAScore: room.teamAScore, teamBScore: room.teamBScore });
+                            io.to(room.id).emit("gameOver", {
+                                winner: room.gameEnded, teamAScore: room.teamAScore, teamBScore: room.teamBScore
+                            });
                         } else {
                             setTimeout(() => {
                                 dealWarmup(room);
@@ -918,9 +960,13 @@ io.on("connection", socket => {
                             }, 4000);
                         }
                     }
-                } else setTimeout(() => scheduleBotAction(room), 600);
+                } else {
+                    setTimeout(() => scheduleBotAction(room), 600);
+                }
             }, 1200);
-        } else setTimeout(() => scheduleBotAction(room), 600);
+        } else {
+            setTimeout(() => scheduleBotAction(room), 600);
+        }
     });
 
     // VOTE RESET
@@ -928,17 +974,21 @@ io.on("connection", socket => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const pid = socket.data.playerId;
+
         if (room.restartVotes.has(pid)) room.restartVotes.delete(pid);
         else room.restartVotes.add(pid);
+
         io.to(room.id).emit("restartVotesUpdate", {
             votes: Array.from(room.restartVotes),
             total: room.restartVotes.size
         });
+
         if (room.restartVotes.size >= 3) {
             room.teamAScore = 0;
             room.teamBScore = 0;
             room.gameEnded = false;
             room.restartVotes.clear();
+
             dealWarmup(room);
             io.to(room.id).emit("gameRestarted", {});
             sendGameStart(room);
@@ -947,28 +997,35 @@ io.on("connection", socket => {
         }
     });
 
-    // LEAVE
+    // LEAVE ROOM
     socket.on("leaveRoom", () => {
         const roomId = socket.data.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
         const player = room.players.find(p => p.socketId === socket.id);
+
         if (player) {
             player.connected = false;
             player.socketId = null;
             player.hand = [];
             player.tricks = 0;
             room.restartVotes.delete(player.id);
+
             io.to(roomId).emit("roomUpdate", {
                 players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team }))
             });
             io.to(roomId).emit("playerLeft", { playerId: player.id, playerName: player.name });
         }
+
         socket.leave(roomId);
         socket.data.roomId = null;
         socket.data.playerId = null;
+
         const anyConnected = room.players.some(p => p.connected && !p.isBot);
-        if (!anyConnected) { delete rooms[roomId]; console.log(`🗑️ Room ${roomId} deleted`); }
+        if (!anyConnected) {
+            delete rooms[roomId];
+            console.log(`🗑️ Room ${roomId} deleted`);
+        }
     });
 
     // DISCONNECT

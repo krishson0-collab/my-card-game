@@ -88,7 +88,9 @@ $("join-btn").onclick = () => {
 
     if (CURRENT_MODE === "bot") {
         const botRoom = "bot_" + Date.now();
-        Sound.bid(); vibrate(30);
+        Sound.bid();
+        vibrate(30);
+        console.log("🤖 Starting bot game:", botRoom, name);
         socket.emit("startBotGame", { roomId: botRoom, playerName: name });
         return;
     }
@@ -105,12 +107,14 @@ const savedName = localStorage.getItem("playerName");
 if (savedName) $("profile-name-display").textContent = savedName;
 
 socket.on("joinError", msg => { $("lobby-msg").textContent = "❌ " + msg; Sound.error(); });
+
 socket.on("joined", data => {
     MY_ID = data.playerId;
     ROOM_ID = data.roomId;
     hide($("lobby"));
     show($("game"));
 });
+
 socket.on("roomUpdate", data => {
     data.players.forEach(p => { PLAYER_NAMES[p.id] = p.name; });
     const list = $("players-list");
@@ -122,15 +126,18 @@ socket.on("roomUpdate", data => {
     });
     refreshAllSeats();
 });
+
 socket.on("errorMsg", msg => { showMsg("❌ " + msg); Sound.error(); vibrate(80); });
 
 $("reset-vote-btn").onclick = () => { Sound.bid(); vibrate(30); socket.emit("voteRestart"); };
+
 socket.on("restartVotesUpdate", data => {
     $("reset-vote-badge").textContent = data.total;
     $("reset-vote-info").textContent = `${data.total}/4`;
     MY_VOTED_RESTART = data.votes.includes(MY_ID);
     $("reset-vote-btn").classList.toggle("voted", MY_VOTED_RESTART);
 });
+
 socket.on("gameRestarted", () => {
     MY_VOTED_RESTART = false;
     $("reset-vote-badge").textContent = "0";
@@ -159,6 +166,7 @@ $("leave-confirm-yes").onclick = () => {
     $("players-list").innerHTML = "";
     hide($("lobby-form"));
 };
+
 socket.on("playerLeft", data => { showMsg(`👋 ${data.playerName} ne room chhod diya`); Sound.pass(); });
 
 // GAME START
@@ -176,7 +184,6 @@ socket.on("gameStart", data => {
     resetAllTricks();
     renderBidHistory(data.bidHistory);
 
-    // Reset trump
     $("trump-display").textContent = "-";
     $("trump-chooser-name").textContent = "";
     const tIcon = $("trump-icon");
@@ -195,7 +202,6 @@ socket.on("gameStart", data => {
     clearActiveLeader();
     clearBidWinner();
 
-    // Hide bid UI — table khali
     $("bid-ui").classList.remove("active");
 
     showMsg(data.phase === "warmup" ? "🔥 WARMUP — 5 cards" : "🃏 MAIN ROUND — 13 cards");
@@ -238,16 +244,17 @@ document.querySelectorAll(".bid-button, .bid-button-warmup").forEach(b => {
         socket.emit("bid", { bid: Number(b.dataset.bid) });
     };
 });
+
 $("pass-button").onclick = () => {
     if ($("pass-button").disabled) return;
     Sound.pass(); vibrate(50); socket.emit("pass");
 };
+
 $("pass-button-main").onclick = () => {
     if ($("pass-button-main").disabled) return;
     Sound.pass(); vibrate(50); socket.emit("pass");
 };
 
-// BID UPDATE — TABLE KHALI RAKHNE KE LIYE
 socket.on("bidUpdate", data => {
     CURRENT_PHASE = data.phase;
     updatePhaseUI(data.phase);
@@ -256,14 +263,12 @@ socket.on("bidUpdate", data => {
     const bidUi = $("bid-ui");
 
     if (data.biddingActive && data.nextBidderId === MY_ID) {
-        // SIRF MERI BAARI MEIN SHOW
         bidUi.classList.add("active");
         $("bid-turn-info").textContent = "🎯 Tumhari baari";
         enableBidButtons(true);
         Sound.yourTurn();
         vibrate([100, 50, 100]);
     } else {
-        // WARNA HIDE — TABLE KHALI
         bidUi.classList.remove("active");
         enableBidButtons(false);
     }
@@ -283,6 +288,9 @@ function enableBidButtons(on) {
 }
 
 socket.on("biddingFinished", data => {
+    $("bid-ui").classList.remove("active");
+    enableBidButtons(false);
+
     showMsg(`👑 ${data.highestBidderName} — ${data.highestBid}`);
     BID_WINNER_ID = data.highestBidderId;
     setBidWinner(data.highestBidderId);
@@ -299,7 +307,6 @@ document.querySelectorAll("#trump-buttons button").forEach(b => {
     };
 });
 
-// TRUMPOT + HUMAN dono
 socket.on("trumpSet", data => {
     const chooserName = data.highestBidderName || getPlayerName(data.highestBidderId);
 
@@ -318,8 +325,17 @@ socket.on("trumpSet", data => {
     if (data.waitReveal && data.highestBidderId === MY_ID) show($("reveal-panel"));
 });
 
-$("reveal-yes").onclick = () => { Sound.bid(); socket.emit("revealDecision", { decision: "show" }); hide($("reveal-panel")); };
-$("reveal-no").onclick = () => { Sound.pass(); socket.emit("revealDecision", { decision: "hide" }); hide($("reveal-panel")); };
+$("reveal-yes").onclick = () => {
+    Sound.bid();
+    socket.emit("revealDecision", { decision: "show" });
+    hide($("reveal-panel"));
+};
+
+$("reveal-no").onclick = () => {
+    Sound.pass();
+    socket.emit("revealDecision", { decision: "hide" });
+    hide($("reveal-panel"));
+};
 
 socket.on("teammateRevealed", data => {
     if (data.revealed) {
@@ -351,13 +367,11 @@ $("toggle-reveal-btn").onclick = () => {
     Sound.bid(); vibrate(30);
 };
 
-// ROUND STARTED — TRUMP DISPLAY FIX (BOT KE LIYE BHI)
 socket.on("roundStarted", data => {
     CURRENT_PHASE = data.phase;
     updatePhaseUI(data.phase);
     renderHand(data.yourHand);
 
-    // TRUMP DISPLAY UPDATE
     $("trump-display").textContent = data.trumpSuit;
 
     const tIcon = $("trump-icon");
@@ -378,7 +392,6 @@ socket.on("roundStarted", data => {
     clearAllSlots();
     TEAMMATE_CARDS_VISIBLE = true;
 
-    // HIDE BID UI — TABLE KHALI
     $("bid-ui").classList.remove("active");
 
     if (data.revealedHand && data.revealedHand.length > 0) {
@@ -478,7 +491,9 @@ function renderTeammateCards(hand, ownerId) {
 socket.on("trickResolved", data => {
     if (data.warmupFailed) showMsg(`💥 Warmup khatam — bidder ki team haar gayi!`);
     else showMsg(`🏆 ${getPlayerName(data.winnerId)} ne trick ${data.trickNumber} jeeti`);
+
     if (data.winnerId === MY_ID) { Sound.trickWin(); vibrate([50, 30, 50, 30, 100]); }
+
     setTimeout(() => clearAllSlots(), 1200);
     updatePlayerStats(data.players);
     setActivePlayer(data.nextPlayerId);
@@ -488,6 +503,7 @@ socket.on("trickResolved", data => {
 socket.on("roundEnd", result => {
     $("team-a-score").textContent = result.teamAScore;
     $("team-b-score").textContent = result.teamBScore;
+
     let summary;
     if (result.phase === "warmup") {
         if (result.success) {
@@ -523,9 +539,16 @@ socket.on("gameOver", data => {
     $("final-row-b").classList.toggle("winner", data.winner === "B");
     $("result-message").textContent = `Team ${data.winner} ne 52 SAR cross kiye!`;
     show($("game-over-panel"));
+
     const myTeam = (MY_ID === 1 || MY_ID === 2) ? "A" : "B";
-    if (data.winner === myTeam) { Sound.gameWin(); launchConfetti(); vibrate([200, 100, 200, 100, 400]); }
-    else { Sound.gameLose(); vibrate(500); }
+    if (data.winner === myTeam) {
+        Sound.gameWin();
+        launchConfetti();
+        vibrate([200, 100, 200, 100, 400]);
+    } else {
+        Sound.gameLose();
+        vibrate(500);
+    }
 });
 
 $("close-result-btn").onclick = () => hide($("game-over-panel"));
@@ -535,27 +558,39 @@ function getSeatElByPlayerId(pid) {
     if (!pos) return null;
     return $(`seat-${pos}`);
 }
+
 function setActivePlayer(pid) {
     document.querySelectorAll(".seat").forEach(el => el.classList.remove("active"));
     if (!pid) return;
     const seat = getSeatElByPlayerId(pid);
     if (seat) seat.classList.add("active");
 }
-function clearActivePlayer() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("active")); }
+
+function clearActivePlayer() {
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("active"));
+}
+
 function setTrickLeader(pid) {
     document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader"));
     if (!pid) return;
     const seat = getSeatElByPlayerId(pid);
     if (seat) seat.classList.add("leader");
 }
-function clearActiveLeader() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader", "active")); }
+
+function clearActiveLeader() {
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader", "active"));
+}
+
 function setBidWinner(pid) {
     document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner"));
     if (!pid) return;
     const seat = getSeatElByPlayerId(pid);
     if (seat) seat.classList.add("bid-winner");
 }
-function clearBidWinner() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner")); }
+
+function clearBidWinner() {
+    document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner"));
+}
 
 function updatePlayerStats(players) {
     players.forEach(p => {
@@ -575,6 +610,7 @@ function updatePlayerStats(players) {
         if (bottomTricks && myPlayer.tricks !== undefined) bottomTricks.textContent = myPlayer.tricks;
     }
 }
+
 function resetAllTricks() {
     ["top", "left", "right", "bottom"].forEach(pos => {
         const el = $(`${pos}-tricks`);
