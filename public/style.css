@@ -16,7 +16,9 @@ html, body {
 .hidden { display: none !important; }
 button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 
-/* LOBBY */
+/* ======================================================
+   LOBBY
+   ====================================================== */
 #lobby {
     position: fixed; inset: 0; overflow-y: auto; padding: 16px;
     background:
@@ -133,7 +135,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #players-list > div { padding: 8px 12px; font-size: 13px; font-weight: 700; color: #4a2020; background: #fff; border-radius: 12px; margin-bottom: 6px; border: 1.5px solid #f0d8dc; }
 .lobby-footer { text-align: center; margin: 0; font-size: 12px; font-weight: 700; color: #b08090; }
 
-/* GAME SCREEN */
+/* ======================================================
+   GAME SCREEN
+   ====================================================== */
 #game {
     width: 100vw; height: 100vh; height: 100dvh;
     overflow: hidden; display: flex; flex-direction: column;
@@ -215,7 +219,12 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 4px; position: relative; min-height: 0; min-width: 0;
 }
-.seat-top { grid-area: top; justify-content: flex-start; }
+.seat-top {
+    grid-area: top;
+    justify-content: flex-start;
+    padding-top: 0;
+    margin-top: -10px;
+}
 .seat-left { grid-area: left; align-items: flex-start; justify-content: center; }
 .seat-right { grid-area: right; align-items: flex-end; justify-content: center; }
 .seat-bottom { grid-area: bottom; justify-content: flex-end; }
@@ -336,11 +345,17 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     display: flex; flex-direction: column; gap: 2px;
     margin-top: auto; padding-top: 20px;
 }
+
+/* MY PROFILE — RIGHT SIDE */
 #my-avatar-row {
-    display: flex; align-items: flex-end; justify-content: center; gap: 0;
-    margin-bottom: -8px; z-index: 3;
+    display: flex; align-items: flex-end;
+    justify-content: flex-end;
+    padding-right: 10px;
+    margin-bottom: 0;
+    gap: 0;
+    z-index: 3;
 }
-.my-avatar-wrap { position: relative; width: 56px; height: 56px; }
+.my-avatar-wrap { position: relative; width: 56px; height: 56px; order: 2; }
 .my-avatar-inner {
     width: 56px; height: 56px; border-radius: 50%;
     background: #fff; display: flex; align-items: center; justify-content: center;
@@ -352,11 +367,14 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .my-name-badge {
     display: flex; align-items: center; gap: 6px;
     background: rgba(30, 15, 15, 0.95); color: #fff;
-    padding: 6px 14px; border-radius: 20px;
+    padding: 6px 18px 6px 14px;
+    border-radius: 20px;
     font-size: 12px; font-weight: 800;
     border: 1.5px solid rgba(255, 220, 180, 0.4);
-    margin-left: -8px; padding-left: 18px;
+    margin-right: -8px;
+    margin-left: 0;
     z-index: 1; margin-bottom: 4px;
+    order: 1;
 }
 .my-score { background: #ffd966; color: #6d2518; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 900; }
 .my-coin {
@@ -648,6 +666,7 @@ body.spectator-mode #bid-ui { display: none !important; }
     #teammate-cards-list .card .c-rank { font-size: 9px; }
     #teammate-cards-list .card .c-suit { font-size: 11px; }
     #spectator-banner { font-size: 10px; padding: 4px 10px; top: calc(60px + env(safe-area-inset-top, 0)); }
+    #my-avatar-row { padding-right: 6px; }
 }
 
 /* LANDSCAPE */
