@@ -3,311 +3,214 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#f4d0d8">
-<title>🎴 Desi Call Break</title>
+<title>29 Card Game</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- LOBBY -->
+<!-- ============ LOBBY ============ -->
 <div id="lobby">
     <div class="lobby-content">
         <div class="game-logo">
-            <div class="logo-icon-big">🎴</div>
-            <h1 class="game-title">Desi Call Break</h1>
-            <p class="game-subtitle">Khelo doston ke saath</p>
+            <span class="logo-icon-big">🃏</span>
+            <h1 class="game-title">29</h1>
+            <p class="game-subtitle">Card Game • 4 Players</p>
         </div>
 
-        <div class="profile-card">
-            <div class="profile-avatar">🧑</div>
-            <div class="profile-info">
-                <div class="profile-name" id="profile-name-display">Player</div>
-                <div class="profile-coin">
-                    <span class="coin-icon">💎</span>
-                    <span id="profile-coin">100</span>
-                </div>
-            </div>
-            <button class="add-coin-btn">+</button>
+        <div class="input-group">
+            <label class="input-label">Your Name</label>
+            <input id="input-name" type="text" placeholder="Enter your name" maxlength="15">
         </div>
 
-        <div class="mode-grid">
-            <button class="mode-card" id="bot-btn">
-                <div class="mode-icon">🤖</div>
-                <div class="mode-title">Practice</div>
-                <div class="mode-sub">Bots ke saath</div>
-            </button>
-            <button class="mode-card" id="online-btn">
-                <div class="mode-icon">👤</div>
-                <div class="mode-title">Play Online</div>
-                <div class="mode-sub">Friends ke saath</div>
-            </button>
-            <button class="mode-card" id="private-btn">
-                <div class="mode-icon">🔒</div>
-                <div class="mode-title">Play Privately</div>
-                <div class="mode-sub">Password room</div>
-            </button>
-            <button class="mode-card" id="local-btn">
-                <div class="mode-icon">📱</div>
-                <div class="mode-title">Play Locally</div>
-                <div class="mode-sub">Same WiFi</div>
-            </button>
+        <div class="input-group">
+            <label class="input-label">Room ID</label>
+            <input id="input-room" type="text" placeholder="e.g. 1234" maxlength="10">
         </div>
 
-        <button class="spectate-btn" id="spectate-btn">
-            👀 Spectate Game
-        </button>
-
-        <div id="lobby-form" class="hidden">
-            <div class="lobby-form-box">
-                <h3 id="form-title">Join Room</h3>
-                <div class="input-group">
-                    <label class="input-label">👤 Tumhara Naam</label>
-                    <input id="player-name" placeholder="Rahul" maxlength="20" autocomplete="off" />
-                </div>
-                <div class="input-group" id="room-code-group">
-                    <label class="input-label">🚪 Room Code</label>
-                    <input id="room-id" placeholder="dost123" maxlength="20" autocomplete="off" />
-                </div>
-                <div class="input-group" id="room-pass-group">
-                    <label class="input-label">🔒 Password</label>
-                    <input id="room-password" placeholder="Password" maxlength="20" type="password" autocomplete="off" />
-                </div>
-                <p id="lobby-msg"></p>
-                <div class="form-buttons">
-                    <button id="form-back">← Back</button>
-                    <button id="join-btn">Start →</button>
-                </div>
-            </div>
+        <div class="input-group">
+            <label class="input-label">Password (optional)</label>
+            <input id="input-pass" type="text" placeholder="Leave empty for no password">
         </div>
 
-        <div id="players-list"></div>
-        <p class="lobby-footer">🎴 4 players • 2 teams • 52 cards</p>
+        <button id="btn-join" class="primary-btn">🚪 Join Room</button>
+        <button id="btn-bot" class="secondary-btn">🤖 Play vs Bots</button>
+        <button id="btn-spectate" class="secondary-btn">👁️ Spectate Match</button>
+
+        <p id="lobby-msg"></p>
     </div>
 </div>
 
-<!-- GAME -->
+<!-- ============ GAME ============ -->
 <div id="game" class="hidden">
 
+    <!-- TOP BAR -->
     <div id="top-bar">
         <div class="round-badge">
-            <div class="rb-icon">📋</div>
+            <span class="rb-icon">📋</span>
             <div class="rb-text">
-                <div class="rb-label">Round</div>
-                <div class="rb-value"><span id="round-counter">1/5</span></div>
+                <span class="rb-label" id="phase-label">WARMUP</span>
+                <span class="rb-value" id="tricks-label">0/5</span>
             </div>
         </div>
 
         <div id="trump-indicator" class="empty">
-            <span id="trump-icon">-</span>
-            <span id="trump-name-small"></span>
+            <span id="trump-icon">?</span>
+            <span id="trump-name-small">No Trump</span>
+        </div>
+
+        <div class="score-mini">
+            <span class="sm-label">A</span><span class="sm-value" id="score-a">0</span>
+            <span class="sm-label">B</span><span class="sm-value" id="score-b">0</span>
         </div>
 
         <div class="top-right-icons">
-            <div class="icon-btn" id="sound-btn"><span class="icon-emoji">🔊</span></div>
-            <div class="icon-btn" id="reset-vote-btn">
+            <button class="icon-btn" id="btn-vote-reset">
                 <span class="icon-emoji">🔄</span>
-                <span class="icon-badge" id="reset-vote-badge">0</span>
-            </div>
-            <div class="icon-btn" id="history-btn"><span class="icon-emoji">📋</span></div>
-            <div class="icon-btn" id="settings-btn"><span class="icon-emoji">⚙️</span></div>
-            <div class="icon-btn" id="leave-fab"><span class="icon-emoji">🚪</span></div>
+                <span class="icon-badge" id="vote-badge">0</span>
+            </button>
+            <button class="icon-btn" id="btn-history"><span class="icon-emoji">📜</span></button>
+            <button class="icon-btn" id="btn-leave"><span class="icon-emoji">🚪</span></button>
         </div>
     </div>
 
-    <div id="header" style="display:none">
-        <span id="room-display">-</span>
-        <span id="trump-display">-</span>
-        <span id="trump-chooser-name"></span>
-        <span id="phase-display">WARMUP</span>
-    </div>
-
-    <div id="score-strip" style="display:none">
-        <span id="team-a-score">0</span>
-        <span id="team-b-score">0</span>
-        <button id="vote-reset-btn">Reset</button>
-        <span id="reset-vote-info">0/4</span>
-    </div>
-
+    <!-- TABLE -->
     <div id="table">
-
-        <div class="seat seat-top" id="seat-top">
-            <div class="player-badge">
-                <span class="pb-name" id="top-name">-</span>
-                <span class="pb-suit">♠️</span>
-            </div>
+        <!-- Top = Player 2 (teammate) -->
+        <div class="seat seat-top" id="seat-2">
+            <div class="player-badge"><span class="pb-name">Player 2</span><span class="pb-suit">♠️</span></div>
             <div class="avatar-wrap">
-                <div class="avatar-fan"><span class="fan-card"></span><span class="fan-card"></span><span class="fan-card"></span></div>
-                <div class="player-avatar" id="top-avatar">🤖</div>
-                <div class="score-badge"><span id="top-tricks">0</span>/<span id="top-count">5</span></div>
+                <div class="player-avatar">🤖</div>
+                <div class="avatar-fan"><div class="fan-card"></div><div class="fan-card"></div><div class="fan-card"></div></div>
+                <div class="score-badge">0/5</div>
             </div>
         </div>
 
-        <div class="seat seat-left" id="seat-left">
-            <div class="player-badge">
-                <span class="pb-name" id="left-name">-</span>
-                <span class="pb-suit">♠️</span>
-            </div>
+        <!-- Left = Player 3 -->
+        <div class="seat seat-left" id="seat-3">
+            <div class="player-badge"><span class="pb-name">Player 3</span><span class="pb-suit">♠️</span></div>
             <div class="avatar-wrap">
-                <div class="avatar-fan"><span class="fan-card"></span><span class="fan-card"></span><span class="fan-card"></span></div>
-                <div class="player-avatar" id="left-avatar">🤖</div>
-                <div class="score-badge"><span id="left-tricks">0</span>/<span id="left-count">5</span></div>
+                <div class="player-avatar">🤖</div>
+                <div class="avatar-fan"><div class="fan-card"></div><div class="fan-card"></div><div class="fan-card"></div></div>
+                <div class="score-badge">0/5</div>
             </div>
         </div>
 
-        <div class="seat seat-right" id="seat-right">
-            <div class="player-badge">
-                <span class="pb-name" id="right-name">-</span>
-                <span class="pb-suit">♠️</span>
-            </div>
+        <!-- Right = Player 4 -->
+        <div class="seat seat-right" id="seat-4">
+            <div class="player-badge"><span class="pb-name">Player 4</span><span class="pb-suit">♠️</span></div>
             <div class="avatar-wrap">
-                <div class="avatar-fan"><span class="fan-card"></span><span class="fan-card"></span><span class="fan-card"></span></div>
-                <div class="player-avatar" id="right-avatar">🤖</div>
-                <div class="score-badge"><span id="right-tricks">0</span>/<span id="right-count">5</span></div>
+                <div class="player-avatar">🤖</div>
+                <div class="avatar-fan"><div class="fan-card"></div><div class="fan-card"></div><div class="fan-card"></div></div>
+                <div class="score-badge">0/5</div>
             </div>
         </div>
 
-        <div class="seat seat-bottom" id="seat-bottom"></div>
-
+        <!-- Center played cards -->
         <div id="played-cards-center">
-            <div class="pc-slot pc-top" id="slot-top"></div>
-            <div class="pc-slot pc-left" id="slot-left"></div>
-            <div class="pc-slot pc-right" id="slot-right"></div>
-            <div class="pc-slot pc-bottom" id="slot-bottom"></div>
+            <div class="pc-slot pc-top" id="pc-2"></div>
+            <div class="pc-slot pc-left" id="pc-3"></div>
+            <div class="pc-slot pc-right" id="pc-4"></div>
+            <div class="pc-slot pc-bottom" id="pc-1"></div>
         </div>
-
     </div>
 
+    <!-- MY AREA -->
     <div id="my-area">
+        <!-- Revealed partner hand -->
         <div id="teammate-cards" class="hidden">
             <div class="tc-header">
-                <h4>👀 Partner — <span id="revealed-owner">?</span></h4>
-                <button id="toggle-reveal-btn" class="toggle-reveal-btn">🙈 Hide</button>
+                <h4 id="partner-title">👀 Partner's Hand</h4>
+                <button class="toggle-reveal-btn" id="btn-toggle-reveal">🙈 Hide</button>
             </div>
             <div id="teammate-cards-list"></div>
         </div>
 
         <div id="my-avatar-row">
-            <div class="my-avatar-wrap">
-                <div class="avatar-fan my-fan"><span class="fan-card"></span><span class="fan-card"></span></div>
-                <div class="my-avatar-inner">🧑</div>
-            </div>
             <div class="my-name-badge">
-                <span class="pb-suit">♠️</span>
-                <span id="bottom-name">You</span>
-                <span class="my-score"><span id="bottom-tricks">0</span></span>
-                <span class="my-coin"><span class="coin-icon-small">💎</span><span>100</span></span>
+                <span id="my-name">You</span>
+                <span class="my-score" id="my-tricks">0</span>
+            </div>
+            <div class="my-avatar-wrap">
+                <div class="my-avatar-inner">😎</div>
             </div>
         </div>
+
         <div id="player1-cards"></div>
     </div>
 
-    <div id="messages"><div id="game-message">Waiting...</div></div>
-
+    <!-- Bid UI -->
     <div id="bid-ui">
-        <div id="bid-turn-info"></div>
-        <div id="warmup-bid-buttons" class="hidden">
-            <button class="bid-button-warmup" data-bid="5">Bid 5</button>
-            <button id="pass-button">PASS</button>
-        </div>
-        <div id="main-bid-buttons" class="hidden">
-            <button class="bid-button" data-bid="8">8</button>
-            <button class="bid-button" data-bid="9">9</button>
-            <button class="bid-button" data-bid="10">10</button>
-            <button class="bid-button" data-bid="11">11</button>
-            <button class="bid-button" data-bid="12">12</button>
-            <button class="bid-button" data-bid="13">13</button>
-            <button id="pass-button-main">PASS</button>
-        </div>
+        <div id="bid-turn-info">Your turn to bid</div>
+        <div id="main-bid-buttons"></div>
     </div>
 
-    <div id="history-overlay" class="hidden"></div>
-    <div id="history-panel" class="hidden">
-        <div class="drag-bar"></div>
-        <div id="history-header"><h3>📋 History</h3><button id="close-history-btn">✕</button></div>
-        <div id="history-content">
-            <div id="bid-history-panel"><h4>💰 Bids</h4><div id="bid-history-list"><div class="bid-empty">No bids yet...</div></div></div>
-            <div id="round-history"><h4>🎴 Rounds</h4><div id="round-history-list"></div></div>
-        </div>
-    </div>
-
-    <div id="settings-panel" class="hidden">
-        <div class="settings-box">
-            <div class="settings-header">
-                <h3>⚙️ Settings</h3>
-                <button id="close-settings-btn" class="settings-close">✕</button>
-            </div>
-            <div class="settings-menu">
-                <button class="settings-item" id="settings-sound">
-                    <span class="si-icon">🔊</span>
-                    <span class="si-label">Sound</span>
-                    <span class="si-value" id="sound-status">On</span>
-                </button>
-                <button class="settings-item" id="settings-history">
-                    <span class="si-icon">📋</span>
-                    <span class="si-label">History</span>
-                    <span class="si-arrow">→</span>
-                </button>
-                <button class="settings-item danger" id="settings-leave">
-                    <span class="si-icon">🚪</span>
-                    <span class="si-label">Leave Room</span>
-                    <span class="si-arrow">→</span>
-                </button>
-            </div>
-            <p class="settings-footer">Desi Call Break v1.0</p>
-        </div>
-    </div>
-
-    <div id="trump-panel" class="hidden">
-        <div class="trump-box">
-            <h3>👑 Trump Chuno</h3>
-            <div id="trump-buttons">
-                <button data-suit="♠️">♠️</button>
-                <button data-suit="♥️">♥️</button>
-                <button data-suit="♦️">♦️</button>
-                <button data-suit="♣️">♣️</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="reveal-panel" class="hidden">
-        <div class="reveal-box">
-            <h3>Partner ke cards dikhane hain?</h3>
-            <p>Bid 9+ hai. Haan bologe toh <b>sab dekhenge</b>.</p>
-            <div><button id="reveal-yes">Haan</button><button id="reveal-no">Nahi</button></div>
-        </div>
-    </div>
-
-    <div id="game-over-panel" class="hidden">
-        <div class="result-box">
-            <div class="trophy">🏆</div>
-            <h1>GAME OVER</h1>
-            <h2 id="winner-team">Team A Wins!</h2>
-            <div class="final-scores">
-                <div class="score-row" id="final-row-a"><span class="team-label">Team A</span><span class="team-score" id="final-team-a">0</span></div>
-                <div class="score-row" id="final-row-b"><span class="team-label">Team B</span><span class="team-score" id="final-team-b">0</span></div>
-            </div>
-            <div class="result-message" id="result-message"></div>
-            <button id="close-result-btn">👍 OK</button>
-        </div>
-    </div>
-
-    <div id="leave-confirm-panel" class="hidden">
-        <div class="leave-box">
-            <h3>🚪 Room chhodna hai?</h3>
-            <p>Aap game se bahar nikal jaoge.</p>
-            <div><button id="leave-confirm-yes">Haan</button><button id="leave-confirm-no">Nahi</button></div>
-        </div>
-    </div>
-
-    <div style="display:none">
-        <span id="you-display">-</span>
-        <span id="current-bid">4</span>
-    </div>
-
+    <!-- Spectator banner -->
+    <div id="spectator-banner" class="hidden">👁️ SPECTATING</div>
 </div>
 
-<script src="sound.js"></script>
+<!-- ============ MODALS ============ -->
+<div id="trump-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <h3>Choose Trump 🎯</h3>
+        <div id="trump-buttons">
+            <button data-suit="♠️">♠️</button>
+            <button data-suit="♥️">♥️</button>
+            <button data-suit="♦️">♦️</button>
+            <button data-suit="♣️">♣️</button>
+        </div>
+    </div>
+</div>
+
+<div id="reveal-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <h3>Show Partner's Cards?</h3>
+        <p>Bid was 9+. Do you want to reveal your teammate's hand to everyone?</p>
+        <div class="modal-buttons">
+            <button id="reveal-yes" class="primary-btn">👀 Show</button>
+            <button id="reveal-no" class="danger-btn">🙈 Hide</button>
+        </div>
+    </div>
+</div>
+
+<div id="round-end-modal" class="modal-overlay hidden">
+    <div class="modal-box result-box">
+        <div class="trophy" id="round-trophy">🎉</div>
+        <h1 id="round-result-title">Round Over</h1>
+        <h2 id="round-result-sub"></h2>
+        <div class="final-scores" id="round-scores"></div>
+    </div>
+</div>
+
+<div id="game-over-modal" class="modal-overlay hidden">
+    <div class="modal-box result-box">
+        <div class="trophy">🏆</div>
+        <h1 id="game-over-title">Game Over</h1>
+        <h2 id="game-over-sub"></h2>
+        <div class="final-scores" id="game-over-scores"></div>
+        <button id="btn-back-lobby" class="primary-btn">Back to Lobby</button>
+    </div>
+</div>
+
+<!-- HISTORY -->
+<div id="history-panel" class="hidden">
+    <div class="drag-bar"></div>
+    <div id="history-header">
+        <h3>Game History</h3>
+        <button id="btn-close-history">✕</button>
+    </div>
+    <div id="history-content">
+        <div id="bid-history-panel">
+            <h4>Bidding History</h4>
+            <div id="bid-history-list"></div>
+        </div>
+        <div id="round-history">
+            <h4>Round History</h4>
+            <div id="round-history-list"></div>
+        </div>
+    </div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
-<script src="game.js"></script>
+<script src="client.js"></script>
 </body>
 </html>

@@ -1,705 +1,570 @@
+/* =========================================================
+   29 Card Game — Client
+   Works with server.js (socket.io)
+   ========================================================= */
+
 const socket = io();
 
-let MY_ID = null;
-let MY_NAME = "";
-let ROOM_ID = null;
-let CURRENT_PHASE = "warmup";
-let MY_VOTED_RESTART = false;
-let PLAYER_NAMES = {};
-let BID_WINNER_ID = null;
-let CURRENT_MODE = "online";
-let TEAMMATE_CARDS_VISIBLE = true;
-let IS_SPECTATOR = false;
+// State
+const S = {
+    myId: null,
+    roomId: null,
+    isSpectator: false,
+    myHand: [],
+    phase: 'warmup',
+    trumpSuit: null,
+    currentPlayerId: null,
+    currentBid: 7,
+    highestBid: 7,
+    highestBidderId: null,
+    biddingActive: false,
+    nextBidderId: null,
+    handSizes: {},
+    tricks: {},
+    revealedHand: null,
+    revealedOwnerId: null,
+    bidWinnerId: null,
+    teamAScore: 0,
+    teamBScore: 0,
+    totalTricks: 5,
+    playerNames: {},
+    playerTeams: {},
+    bidHistory: []
+};
 
 const $ = id => document.getElementById(id);
-const show = el => el.classList.remove("hidden");
-const hide = el => el.classList.add("hidden");
 
-const RIGHT_HAND_ORDER = [1, 4, 2, 3];
-const TEAMMATES = { 1: 2, 2: 1, 3: 4, 4: 3 };
-
-function getPlayerName(pid) {
-    if (pid === MY_ID) return "You";
-    return PLAYER_NAMES[pid] || `P${pid}`;
-}
-
-function getSeatPosition(playerId) {
-    if (playerId === MY_ID) return "bottom";
-    if (playerId === TEAMMATES[MY_ID]) return "top";
-    const myIdx = RIGHT_HAND_ORDER.indexOf(MY_ID);
-    const rightPlayer = RIGHT_HAND_ORDER[(myIdx + 1) % 4];
-    const leftPlayer = RIGHT_HAND_ORDER[(myIdx + 3) % 4];
-    if (playerId === rightPlayer) return "right";
-    if (playerId === leftPlayer) return "left";
-    return null;
-}
-
-$("sound-btn").onclick = () => {
-    Sound.init();
-    Sound.enabled = !Sound.enabled;
-    const btn = $("sound-btn");
-    btn.querySelector(".icon-emoji").textContent = Sound.enabled ? "🔊" : "🔇";
-    const status = $("sound-status");
-    if (status) status.textContent = Sound.enabled ? "On" : "Off";
-    if (Sound.enabled) Sound.bid();
-    vibrate(30);
-};
-
-// ======================================================
-// LOBBY
-// ======================================================
-function openLobbyForm(mode) {
-    CURRENT_MODE = mode;
-    const form = $("lobby-form");
-    const title = $("form-title");
-    const roomCodeGroup = $("room-code-group");
-    const roomPassGroup = $("room-pass-group");
-
-    roomCodeGroup.classList.remove("hidden");
-    roomPassGroup.classList.remove("hidden");
-
-    if (mode === "bot") {
-        title.textContent = "🤖 Practice Mode";
-        roomCodeGroup.classList.add("hidden");
-        roomPassGroup.classList.add("hidden");
-    } else if (mode === "online") {
-        title.textContent = "🌐 Play Online";
-        roomPassGroup.classList.add("hidden");
-    } else if (mode === "private") {
-        title.textContent = "🔒 Private Room";
-    } else if (mode === "local") {
-        title.textContent = "📱 Play Locally";
-    } else if (mode === "spectate") {
-        title.textContent = "👀 Spectate Room";
-    }
-
-    $("lobby-msg").textContent = "";
-    show(form);
-}
-
-$("bot-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("bot"); };
-$("online-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("online"); };
-$("private-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("private"); };
-$("local-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("local"); };
-$("spectate-btn").onclick = () => { Sound.bid(); vibrate(30); openLobbyForm("spectate"); };
-$("form-back").onclick = () => { Sound.pass(); hide($("lobby-form")); };
-
-$("join-btn").onclick = () => {
-    const name = $("player-name").value.trim() || "Player";
-    const room = $("room-id").value.trim().toLowerCase();
-    const password = $("room-password").value.trim();
-
-    $("profile-name-display").textContent = name;
-    localStorage.setItem("playerName", name);
-
-    if (CURRENT_MODE === "bot") {
-        const botRoom = "bot_" + Date.now();
-        Sound.bid();
-        vibrate(30);
-        socket.emit("startBotGame", { roomId: botRoom, playerName: name });
-        return;
-    }
-
-    if (!room) return ($("lobby-msg").textContent = "Room code daalo");
-    if (CURRENT_MODE === "private" && !password) return ($("lobby-msg").textContent = "Password daalo");
-
-    if (CURRENT_MODE === "spectate") {
-        socket.emit("joinRoom", {
-            roomId: room,
-            playerName: name,
-            password: password,
-            isSpectator: true
-        });
-        return;
-    }
-
-    ROOM_ID = room;
-    MY_NAME = name;
-    socket.emit("joinRoom", { roomId: room, playerName: name, password });
-};
-
-const savedName = localStorage.getItem("playerName");
-if (savedName) $("profile-name-display").textContent = savedName;
-
-// ======================================================
-// SOCKET
-// ======================================================
-socket.on("joinError", msg => { $("lobby-msg").textContent = "❌ " + msg; Sound.error(); });
-
-socket.on("joined", data => {
-    MY_ID = data.playerId;
-    ROOM_ID = data.roomId;
-
-    if (data.isSpectator) {
-        IS_SPECTATOR = true;
-        document.body.classList.add("spectator-mode");
-        const banner = document.createElement("div");
-        banner.id = "spectator-banner";
-        banner.textContent = "👀 Spectating";
-        document.body.appendChild(banner);
-    }
-
-    hide($("lobby"));
-    show($("game"));
+/* =========================================================
+   LOBBY ACTIONS
+   ========================================================= */
+$('btn-join').addEventListener('click', () => {
+    const name = $('input-name').value.trim() || 'Player';
+    const room = $('input-room').value.trim();
+    const pass = $('input-pass').value.trim();
+    if (!room) return showLobbyMsg('Enter a Room ID');
+    socket.emit('joinRoom', { roomId: room, playerName: name, password: pass || null });
 });
 
-socket.on("spectatorJoined", data => {
-    if (data.room.players) {
-        data.room.players.forEach(p => { PLAYER_NAMES[p.id] = p.name; });
-        refreshAllSeats();
-        updatePlayerStats(data.room.players);
-    }
-    if (data.room.teamAScore !== undefined) {
-        $("team-a-score").textContent = data.room.teamAScore;
-        $("team-b-score").textContent = data.room.teamBScore;
-    }
-    if (data.room.phase) updatePhaseUI(data.room.phase);
-    showMsg("👀 Aap spectator ho. Game dekho!");
+$('btn-bot').addEventListener('click', () => {
+    const name = $('input-name').value.trim() || 'You';
+    const roomId = 'bot_' + Math.random().toString(36).slice(2, 8);
+    socket.emit('startBotGame', { roomId, playerName: name });
 });
 
-socket.on("roomUpdate", data => {
-    data.players.forEach(p => { PLAYER_NAMES[p.id] = p.name; });
-    const list = $("players-list");
-    list.innerHTML = "<h3>Players:</h3>";
+$('btn-spectate').addEventListener('click', () => {
+    const name = $('input-name').value.trim() || 'Spectator';
+    const room = $('input-room').value.trim();
+    if (!room) return showLobbyMsg('Enter Room ID to spectate');
+    socket.emit('joinRoom', { roomId: room, playerName: name, isSpectator: true });
+});
+
+function showLobbyMsg(msg) {
+    $('lobby-msg').textContent = msg;
+    setTimeout(() => $('lobby-msg').textContent = '', 3500);
+}
+
+/* =========================================================
+   SOCKET EVENTS
+   ========================================================= */
+socket.on('joined', data => {
+    S.myId = data.playerId;
+    S.roomId = data.roomId;
+    S.isSpectator = !!data.isSpectator;
+    $('lobby').classList.add('hidden');
+    $('game').classList.remove('hidden');
+    if (S.isSpectator) {
+        $('spectator-banner').classList.remove('hidden');
+        $('my-area').classList.add('hidden');
+        $('bid-ui').classList.remove('active');
+    }
+});
+
+socket.on('joinError', msg => showLobbyMsg(msg));
+
+socket.on('roomUpdate', data => {
     data.players.forEach(p => {
-        const d = document.createElement("div");
-        d.textContent = `${p.name} (P${p.id}) — ${p.connected ? "✅" : "❌"}`;
-        list.appendChild(d);
+        S.playerNames[p.id] = p.name;
+        S.playerTeams[p.id] = p.team;
+        const seat = $('seat-' + p.id);
+        if (seat) seat.querySelector('.pb-name').textContent = p.name;
     });
-    refreshAllSeats();
+    if (S.myId && S.playerNames[S.myId]) {
+        $('my-name').textContent = S.playerNames[S.myId];
+    }
 });
 
-socket.on("errorMsg", msg => { showMsg("❌ " + msg); Sound.error(); vibrate(80); });
+socket.on('gameStart', data => {
+    S.myId = data.yourId;
+    S.myHand = data.yourHand || [];
+    S.phase = data.phase;
+    S.currentBid = data.currentBid;
+    S.teamAScore = data.teamAScore;
+    S.teamBScore = data.teamBScore;
+    S.totalTricks = data.phase === 'warmup' ? 5 : 13;
+    S.revealedHand = null;
+    S.revealedOwnerId = null;
+    S.bidWinnerId = null;
+    S.trumpSuit = null;
 
-$("reset-vote-btn").onclick = () => { Sound.bid(); vibrate(30); socket.emit("voteRestart"); };
-
-socket.on("restartVotesUpdate", data => {
-    $("reset-vote-badge").textContent = data.total;
-    $("reset-vote-info").textContent = `${data.total}/4`;
-    MY_VOTED_RESTART = data.votes.includes(MY_ID);
-    $("reset-vote-btn").classList.toggle("voted", MY_VOTED_RESTART);
-});
-
-socket.on("gameRestarted", () => {
-    MY_VOTED_RESTART = false;
-    $("reset-vote-badge").textContent = "0";
-    $("reset-vote-btn").classList.remove("voted");
-});
-
-$("history-btn").onclick = () => { Sound.bid(); show($("history-overlay")); show($("history-panel")); };
-$("close-history-btn").onclick = () => { hide($("history-overlay")); hide($("history-panel")); };
-$("history-overlay").onclick = () => { hide($("history-overlay")); hide($("history-panel")); };
-
-$("settings-btn").onclick = () => { Sound.bid(); vibrate(30); show($("settings-panel")); };
-$("close-settings-btn").onclick = () => { hide($("settings-panel")); };
-$("settings-sound").onclick = () => { $("sound-btn").onclick(); };
-$("settings-history").onclick = () => { hide($("settings-panel")); show($("history-overlay")); show($("history-panel")); };
-$("settings-leave").onclick = () => { hide($("settings-panel")); show($("leave-confirm-panel")); };
-
-$("leave-fab").onclick = () => { Sound.pass(); vibrate(50); show($("leave-confirm-panel")); };
-$("leave-confirm-no").onclick = () => { hide($("leave-confirm-panel")); };
-$("leave-confirm-yes").onclick = () => {
-    Sound.pass(); vibrate(100);
-    socket.emit("leaveRoom");
-    hide($("leave-confirm-panel"));
-    hide($("game"));
-    show($("lobby"));
-    MY_ID = null; ROOM_ID = null; PLAYER_NAMES = {}; BID_WINNER_ID = null;
-    $("players-list").innerHTML = "";
-    hide($("lobby-form"));
-};
-
-socket.on("playerLeft", data => { showMsg(`👋 ${data.playerName} ne room chhod diya`); Sound.pass(); });
-
-// ======================================================
-// GAME START
-// ======================================================
-socket.on("gameStart", data => {
-    MY_ID = data.yourId;
-    CURRENT_PHASE = data.phase;
-    data.players.forEach(p => { PLAYER_NAMES[p.id] = p.name; });
-    BID_WINNER_ID = null;
-    TEAMMATE_CARDS_VISIBLE = true;
-
-    refreshAllSeats();
-    updatePhaseUI(data.phase);
-    renderHand(data.yourHand);
-    updatePlayerStats(data.players.map(p => ({ ...p, tricks: 0 })));
-    resetAllTricks();
-    renderBidHistory(data.bidHistory);
-
-    $("trump-display").textContent = "-";
-    $("trump-chooser-name").textContent = "";
-    const tIcon = $("trump-icon");
-    const tName = $("trump-name-small");
-    const tIndicator = $("trump-indicator");
-    if (tIcon) tIcon.textContent = "-";
-    if (tName) tName.textContent = "";
-    if (tIndicator) tIndicator.classList.add("empty");
-
-    $("team-a-score").textContent = data.teamAScore || 0;
-    $("team-b-score").textContent = data.teamBScore || 0;
-
-    clearAllSlots();
-    hide($("teammate-cards"));
-    $("teammate-cards-list").innerHTML = "";
-    clearActiveLeader();
-    clearBidWinner();
-
-    $("bid-ui").classList.remove("active");
-
-    showMsg(data.phase === "warmup" ? "🔥 WARMUP — 5 cards" : "🃏 MAIN ROUND — 13 cards");
-    Sound.deal();
-    vibrate(50);
-    enableBidButtons(false);
-});
-
-function refreshAllSeats() {
-    ["top", "left", "right", "bottom"].forEach(pos => {
-        const nameEl = $(`${pos}-name`);
-        if (nameEl) {
-            for (let pid = 1; pid <= 4; pid++) {
-                if (getSeatPosition(pid) === pos) {
-                    let n = PLAYER_NAMES[pid] || `P${pid}`;
-                    if (pid === MY_ID) n = `${n} (You)`;
-                    nameEl.textContent = n;
-                    const avatarEl = $(`${pos}-avatar`);
-                    if (avatarEl) {
-                        const isBot = (PLAYER_NAMES[pid] || "").includes("Bot") || (PLAYER_NAMES[pid] || "").startsWith("🤖");
-                        avatarEl.textContent = isBot ? "🤖" : "🧑";
-                    }
-                    break;
-                }
-            }
-        }
+    data.players.forEach(p => {
+        S.playerNames[p.id] = p.name;
+        S.playerTeams[p.id] = p.team;
+        S.handSizes[p.id] = p.handSize;
+        S.tricks[p.id] = p.tricks;
     });
-}
 
-function updatePhaseUI(phase) {
-    $("phase-display").textContent = phase === "warmup" ? "WARMUP" : "MAIN";
-    if (phase === "warmup") { show($("warmup-bid-buttons")); hide($("main-bid-buttons")); }
-    else { hide($("warmup-bid-buttons")); show($("main-bid-buttons")); }
-}
+    S.bidHistory = data.bidHistory || [];
+    renderBidHistory();
 
-// ======================================================
-// BIDDING
-// ======================================================
-document.querySelectorAll(".bid-button, .bid-button-warmup").forEach(b => {
-    b.onclick = () => {
-        if (b.disabled) return;
-        Sound.bid(); vibrate(30);
-        socket.emit("bid", { bid: Number(b.dataset.bid) });
-    };
+    $('teammate-cards').classList.add('hidden');
+    document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
+    document.querySelectorAll('.seat').forEach(s => s.classList.remove('active', 'bid-winner'));
+
+    renderGame();
+
+    if (data.currentBidderId === S.myId) {
+        renderBidUI();
+    }
 });
 
-$("pass-button").onclick = () => {
-    if ($("pass-button").disabled) return;
-    Sound.pass(); vibrate(50); socket.emit("pass");
-};
-$("pass-button-main").onclick = () => {
-    if ($("pass-button-main").disabled) return;
-    Sound.pass(); vibrate(50); socket.emit("pass");
-};
+socket.on('bidUpdate', data => {
+    S.currentBid = data.currentBid;
+    S.highestBid = data.highestBid;
+    S.highestBidderId = data.highestBidderId;
+    S.biddingActive = data.biddingActive;
+    S.nextBidderId = data.nextBidderId;
+    S.phase = data.phase;
+    S.bidHistory = data.bidHistory || [];
 
-socket.on("bidUpdate", data => {
-    CURRENT_PHASE = data.phase;
-    updatePhaseUI(data.phase);
-    renderBidHistory(data.bidHistory);
+    renderBidHistory();
 
-    const bidUi = $("bid-ui");
-
-    if (data.biddingActive && data.nextBidderId === MY_ID) {
-        bidUi.classList.add("active");
-        $("bid-turn-info").textContent = "🎯 Tumhari baari";
-        enableBidButtons(true);
-        Sound.yourTurn();
-        vibrate([100, 50, 100]);
+    if (data.biddingActive && data.nextBidderId === S.myId && !S.isSpectator) {
+        renderBidUI();
     } else {
-        bidUi.classList.remove("active");
-        enableBidButtons(false);
+        $('bid-ui').classList.remove('active');
+    }
+});
+
+socket.on('biddingFinished', data => {
+    S.highestBid = data.highestBid;
+    S.highestBidderId = data.highestBidderId;
+    S.biddingActive = false;
+    $('bid-ui').classList.remove('active');
+    renderCrown();
+
+    if (data.highestBidderId === S.myId && !S.isSpectator) {
+        // Show trump modal
+        $('trump-modal').classList.remove('hidden');
+    }
+});
+
+socket.on('warmupSkipped', () => {
+    // Server will send gameStart after 1.5s for main deal
+});
+
+socket.on('trumpSet', data => {
+    S.trumpSuit = data.trumpSuit;
+    S.highestBidderId = data.highestBidderId;
+    updateTrumpIndicator();
+
+    if (data.waitReveal && data.highestBidderId === S.myId && !S.isSpectator) {
+        $('reveal-modal').classList.remove('hidden');
+    }
+});
+
+socket.on('teammateRevealed', data => {
+    // Flag only — actual hand arrives with roundStarted
+});
+
+socket.on('roundStarted', data => {
+    S.myHand = data.yourHand || [];
+    S.trumpSuit = data.trumpSuit;
+    S.currentPlayerId = data.currentPlayerId;
+    S.revealedHand = data.revealedHand;
+    S.revealedOwnerId = data.revealedOwnerId;
+    S.bidWinnerId = data.bidWinnerId;
+    S.phase = data.phase;
+    S.totalTricks = data.totalTricks;
+
+    data.handSizes.forEach(h => {
+        S.handSizes[h.id] = h.size;
+        S.tricks[h.id] = h.tricks;
+    });
+
+    if (S.revealedHand && S.revealedHand.length > 0) {
+        $('teammate-cards').classList.remove('hidden');
+        renderTeammateHand();
     }
 
-    if (data.biddingActive) setActivePlayer(data.nextBidderId);
-    else clearActivePlayer();
+    updateTrumpIndicator();
+    renderGame();
+    renderCrown();
 });
 
-function enableBidButtons(on) {
-    document.querySelectorAll(".bid-button").forEach(b => b.disabled = !on);
-    document.querySelectorAll(".bid-button-warmup").forEach(b => b.disabled = !on);
-    $("pass-button").disabled = !on;
-    $("pass-button-main").disabled = !on;
+socket.on('cardPlayed', data => {
+    const slot = $('pc-' + data.playerId);
+    if (slot) {
+        slot.innerHTML = '';
+        slot.appendChild(makeCardEl(data.card));
+    }
+    S.currentPlayerId = data.nextPlayerId;
+    renderTurnIndicator();
+    highlightPlayable();
+});
+
+socket.on('handUpdate', data => {
+    S.myHand = data.hand || [];
+    renderMyHand();
+    highlightPlayable();
+});
+
+socket.on('trickResolved', data => {
+    data.players.forEach(p => {
+        S.tricks[p.id] = p.tricks;
+        S.handSizes[p.id] = p.handSize;
+    });
+    renderScores();
+
+    setTimeout(() => {
+        document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
+    }, 800);
+
+    S.currentPlayerId = data.nextPlayerId;
+    renderTurnIndicator();
+});
+
+socket.on('revealedHandUpdate', data => {
+    S.revealedHand = data.revealedHand;
+    S.revealedOwnerId = data.revealedOwnerId;
+    if (S.revealedHand && S.revealedHand.length > 0) {
+        $('teammate-cards').classList.remove('hidden');
+        renderTeammateHand();
+    }
+});
+
+socket.on('roundEnd', data => {
+    showRoundEnd(data);
+});
+
+socket.on('gameOver', data => {
+    showGameOver(data);
+});
+
+socket.on('gameRestarted', () => {
+    $('game-over-modal').classList.add('hidden');
+    $('round-end-modal').classList.add('hidden');
+});
+
+socket.on('restartVotesUpdate', data => {
+    $('vote-badge').textContent = data.total;
+});
+
+socket.on('errorMsg', msg => {
+    console.warn('Server error:', msg);
+});
+
+socket.on('playerLeft', data => {
+    console.log(data.playerName + ' left the room');
+});
+
+socket.on('spectatorJoined', data => {
+    // Setup spectator view
+    if (!data.room) return;
+    S.teamAScore = data.room.teamAScore;
+    S.teamBScore = data.room.teamBScore;
+    S.phase = data.room.phase;
+    data.room.players.forEach(p => {
+        S.playerNames[p.id] = p.name;
+        S.playerTeams[p.id] = p.team;
+        S.handSizes[p.id] = p.handSize;
+        S.tricks[p.id] = p.tricks;
+    });
+    renderGame();
+});
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+function renderGame() {
+    renderMyHand();
+    renderScores();
+    renderTurnIndicator();
+    updateTrumpIndicator();
+    renderCrown();
+    $('phase-label').textContent = S.phase === 'warmup' ? 'WARMUP' : 'MAIN';
+    const myTricks = S.tricks[S.myId] || 0;
+    $('tricks-label').textContent = `${myTricks}/${S.totalTricks}`;
+    if (S.playerNames[S.myId]) {
+        $('my-name').textContent = S.playerNames[S.myId];
+    }
 }
 
-socket.on("biddingFinished", data => {
-    $("bid-ui").classList.remove("active");
-    enableBidButtons(false);
-    showMsg(`👑 ${data.highestBidderName} — ${data.highestBid}`);
-    BID_WINNER_ID = data.highestBidderId;
-    setBidWinner(data.highestBidderId);
-    if (data.highestBidderId === MY_ID) show($("trump-panel"));
-});
+function renderMyHand() {
+    if (S.isSpectator) return;
+    const el = $('player1-cards');
+    el.innerHTML = '';
+    S.myHand.forEach((card, idx) => {
+        const cardEl = makeCardEl(card);
+        cardEl.dataset.idx = idx;
+        cardEl.addEventListener('click', () => onPlayCard(idx));
+        el.appendChild(cardEl);
+    });
+}
 
-socket.on("warmupSkipped", () => showMsg("⏭️ Sab pass — main round!"));
+function makeCardEl(card) {
+    const el = document.createElement('div');
+    const isRed = card.suit === '♥️' || card.suit === '♦️';
+    el.className = 'card ' + (isRed ? 'red' : 'black');
+    el.innerHTML = `<div class="c-rank">${card.rank}</div><div class="c-suit">${card.suit}</div>`;
+    return el;
+}
 
-// ======================================================
-// TRUMP
-// ======================================================
-document.querySelectorAll("#trump-buttons button").forEach(b => {
-    b.onclick = () => {
-        Sound.bid(); vibrate(30);
-        socket.emit("chooseTrump", { suit: b.dataset.suit });
-        hide($("trump-panel"));
-    };
-});
+function renderScores() {
+    $('score-a').textContent = S.teamAScore;
+    $('score-b').textContent = S.teamBScore;
 
-socket.on("trumpSet", data => {
-    const chooserName = data.highestBidderName || getPlayerName(data.highestBidderId);
-    $("trump-display").textContent = data.trumpSuit;
-    $("trump-chooser-name").textContent = chooserName ? `(${chooserName})` : "";
+    [1, 2, 3, 4].forEach(id => {
+        const seat = $('seat-' + id);
+        if (!seat) return;
+        const badge = seat.querySelector('.score-badge');
+        if (badge) badge.textContent = `${S.tricks[id] || 0}/${S.totalTricks}`;
+    });
 
-    const tIcon = $("trump-icon");
-    const tName = $("trump-name-small");
-    const tIndicator = $("trump-indicator");
+    $('my-tricks').textContent = S.tricks[S.myId] || 0;
+    $('tricks-label').textContent = `${S.tricks[S.myId] || 0}/${S.totalTricks}`;
+}
 
-    if (tIcon) tIcon.textContent = data.trumpSuit;
-    if (tName) tName.textContent = chooserName ? chooserName.split(" ")[0] : "";
-    if (tIndicator) tIndicator.classList.remove("empty");
+function renderTurnIndicator() {
+    document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
+    if (S.currentPlayerId && S.currentPlayerId !== S.myId) {
+        const seat = $('seat-' + S.currentPlayerId);
+        if (seat) seat.classList.add('active');
+    }
+    highlightPlayable();
+}
 
-    showMsg(`👑 Trump: ${data.trumpSuit} — ${chooserName}`);
-    if (data.waitReveal && data.highestBidderId === MY_ID) show($("reveal-panel"));
-});
+function highlightPlayable() {
+    document.querySelectorAll('#player1-cards .card').forEach(c => c.classList.remove('playable'));
+    if (S.currentPlayerId !== S.myId) return;
+    if (!S.myHand.length) return;
+    document.querySelectorAll('#player1-cards .card').forEach(c => c.classList.add('playable'));
+}
 
-// ======================================================
-// REVEAL
-// ======================================================
-$("reveal-yes").onclick = () => { Sound.bid(); socket.emit("revealDecision", { decision: "show" }); hide($("reveal-panel")); };
-$("reveal-no").onclick = () => { Sound.pass(); socket.emit("revealDecision", { decision: "hide" }); hide($("reveal-panel")); };
-
-socket.on("teammateRevealed", data => {
-    if (data.revealed) {
-        showMsg("👀 Partner ke cards khul gaye");
-        TEAMMATE_CARDS_VISIBLE = true;
-        const list = $("teammate-cards-list");
-        if (list) list.style.display = "flex";
-        const btn = $("toggle-reveal-btn");
-        if (btn) { btn.textContent = "🙈 Hide"; btn.classList.remove("hidden-state"); }
+function updateTrumpIndicator() {
+    const el = $('trump-indicator');
+    if (!S.trumpSuit) {
+        el.classList.add('empty');
+        $('trump-icon').textContent = '?';
+        $('trump-name-small').textContent = 'No Trump';
     } else {
-        showMsg("🔒 Partner ke cards chhupe rahenge");
-        hide($("teammate-cards"));
+        el.classList.remove('empty');
+        $('trump-icon').textContent = S.trumpSuit;
+        const bidderName = S.playerNames[S.highestBidderId] || 'Trump';
+        $('trump-name-small').textContent = bidderName;
     }
-});
+}
 
-$("toggle-reveal-btn").onclick = () => {
-    TEAMMATE_CARDS_VISIBLE = !TEAMMATE_CARDS_VISIBLE;
-    const btn = $("toggle-reveal-btn");
-    const list = $("teammate-cards-list");
-    if (TEAMMATE_CARDS_VISIBLE) {
-        list.style.display = "flex";
-        btn.textContent = "🙈 Hide";
-        btn.classList.remove("hidden-state");
+function renderBidUI() {
+    const container = $('main-bid-buttons');
+    container.innerHTML = '';
+
+    if (S.phase === 'warmup') {
+        const bidBtn = document.createElement('button');
+        bidBtn.textContent = 'Bid 5';
+        bidBtn.onclick = () => {
+            socket.emit('bid', { bid: 5 });
+            $('bid-ui').classList.remove('active');
+        };
+        container.appendChild(bidBtn);
+
+        const passBtn = document.createElement('button');
+        passBtn.textContent = 'PASS';
+        passBtn.className = 'pass-btn';
+        passBtn.onclick = () => {
+            socket.emit('pass');
+            $('bid-ui').classList.remove('active');
+        };
+        container.appendChild(passBtn);
+
+        $('bid-turn-info').textContent = 'Warmup — Bid 5 or Pass';
     } else {
-        list.style.display = "none";
-        btn.textContent = "👁️ Show";
-        btn.classList.add("hidden-state");
-    }
-    Sound.bid(); vibrate(30);
-};
-
-// ======================================================
-// ROUND START
-// ======================================================
-socket.on("roundStarted", data => {
-    CURRENT_PHASE = data.phase;
-    updatePhaseUI(data.phase);
-    renderHand(data.yourHand);
-
-    $("trump-display").textContent = data.trumpSuit;
-
-    const tIcon = $("trump-icon");
-    const tName = $("trump-name-small");
-    const tIndicator = $("trump-indicator");
-
-    if (tIcon && data.trumpSuit) {
-        tIcon.textContent = data.trumpSuit;
-        if (tIndicator) tIndicator.classList.remove("empty");
-        if (tName && data.bidWinnerId) {
-            const name = PLAYER_NAMES[data.bidWinnerId] || `P${data.bidWinnerId}`;
-            tName.textContent = name.split(" ")[0];
+        const startBid = Math.max(8, S.currentBid + 1);
+        for (let v = startBid; v <= 13; v++) {
+            const btn = document.createElement('button');
+            btn.textContent = v;
+            btn.onclick = () => {
+                socket.emit('bid', { bid: v });
+                $('bid-ui').classList.remove('active');
+            };
+            container.appendChild(btn);
         }
+        const passBtn = document.createElement('button');
+        passBtn.textContent = 'PASS';
+        passBtn.className = 'pass-btn';
+        passBtn.onclick = () => {
+            socket.emit('pass');
+            $('bid-ui').classList.remove('active');
+        };
+        container.appendChild(passBtn);
+
+        $('bid-turn-info').textContent = `Bid above ${S.currentBid}`;
     }
 
-    updatePlayerStats(data.handSizes);
-    resetAllTricks();
-    clearAllSlots();
-    TEAMMATE_CARDS_VISIBLE = true;
-
-    $("bid-ui").classList.remove("active");
-
-    if (data.revealedHand && data.revealedHand.length > 0) {
-        renderTeammateCards(data.revealedHand, data.revealedOwnerId);
-    } else {
-        hide($("teammate-cards"));
-    }
-
-    if (data.bidWinnerId) { BID_WINNER_ID = data.bidWinnerId; setBidWinner(data.bidWinnerId); }
-    if (data.currentPlayerId === MY_ID) { Sound.yourTurn(); vibrate([100, 50, 100]); }
-    setActivePlayer(data.currentPlayerId);
-    setTrickLeader(data.leadPlayerId || data.currentPlayerId);
-    showMsg(data.currentPlayerId === MY_ID ? "🎯 Tumhari baari" : `⏳ ${getPlayerName(data.currentPlayerId)} ki baari`);
-});
-
-// ======================================================
-// CARDS
-// ======================================================
-function createCardEl(card, isPlayable = false) {
-    const d = document.createElement("div");
-    d.className = "card";
-    const isRed = card.suit === "♥️" || card.suit === "♦️";
-    if (isRed) d.classList.add("red"); else d.classList.add("black");
-
-    const rankEl = document.createElement("div");
-    rankEl.className = "c-rank";
-    rankEl.textContent = card.rank;
-
-    const suitEl = document.createElement("div");
-    suitEl.className = "c-suit";
-    suitEl.textContent = card.suit;
-
-    d.appendChild(rankEl); d.appendChild(suitEl);
-    if (isPlayable) d.classList.add("playable");
-    return d;
+    $('bid-ui').classList.add('active');
 }
 
-function renderHand(hand) {
-    if (IS_SPECTATOR) return;
-    const c = $("player1-cards");
-    c.innerHTML = "";
-    hand.forEach((card, i) => {
-        const d = createCardEl(card);
-        d.onclick = () => { Sound.cardPlay(); vibrate(20); socket.emit("playCard", { cardIndex: i }); };
-        c.appendChild(d);
-    });
-}
-
-socket.on("handUpdate", data => renderHand(data.hand));
-
-socket.on("cardPlayed", data => {
-    renderPlayedCards(data.trickCards);
-    requestAnimationFrame(() => renderPlayedCards(data.trickCards));
-    setTimeout(() => renderPlayedCards(data.trickCards), 100);
-    Sound.cardPlay();
-    const displayName = data.playerName || getPlayerName(data.playerId);
-    showMsg(`${displayName} → ${data.card.rank}${data.card.suit}`);
-    if (data.nextPlayerId) {
-        setActivePlayer(data.nextPlayerId);
-        if (data.nextPlayerId === MY_ID && !IS_SPECTATOR) {
-            setTimeout(() => { Sound.yourTurn(); vibrate([100, 50, 100]); }, 400);
-        }
-    } else clearActivePlayer();
-    if (data.leadPlayerId) setTrickLeader(data.leadPlayerId);
-});
-
-function renderPlayedCards(trickCards) {
-    if (!trickCards) return;
-    clearAllSlots();
-    trickCards.forEach(item => {
-        const pid = item.playerIndex + 1;
-        const pos = getSeatPosition(pid);
-        if (!pos) return;
-        const slot = $(`slot-${pos}`);
-        if (!slot) return;
-        slot.appendChild(createCardEl(item.card));
-    });
-    document.body.offsetHeight;
-}
-
-function clearAllSlots() {
-    ["top", "left", "right", "bottom"].forEach(pos => {
-        const slot = $(`slot-${pos}`);
-        if (slot) slot.innerHTML = "";
-    });
-}
-
-// ======================================================
-// TEAMMATE REVEALED
-// ======================================================
-socket.on("revealedHandUpdate", data => renderTeammateCards(data.revealedHand, data.revealedOwnerId));
-
-function renderTeammateCards(hand, ownerId) {
-    show($("teammate-cards"));
-    $("revealed-owner").textContent = `${PLAYER_NAMES[ownerId] || "P" + ownerId}`;
-    const c = $("teammate-cards-list");
-    c.innerHTML = "";
-    hand.forEach(card => c.appendChild(createCardEl(card)));
-    c.style.display = "flex";
-    const btn = $("toggle-reveal-btn");
-    if (btn) { btn.textContent = "🙈 Hide"; btn.classList.remove("hidden-state"); }
-}
-
-// ======================================================
-// TRICK RESOLVED
-// ======================================================
-socket.on("trickResolved", data => {
-    if (data.warmupFailed) showMsg(`💥 Warmup khatam — bidder ki team haar gayi!`);
-    else showMsg(`🏆 ${getPlayerName(data.winnerId)} ne trick ${data.trickNumber} jeeti`);
-
-    if (data.winnerId === MY_ID && !IS_SPECTATOR) { Sound.trickWin(); vibrate([50, 30, 50, 30, 100]); }
-
-    setTimeout(() => clearAllSlots(), 1200);
-    updatePlayerStats(data.players);
-    setActivePlayer(data.nextPlayerId);
-    setTrickLeader(data.leadPlayerId || data.nextPlayerId);
-});
-
-// ======================================================
-// ROUND END
-// ======================================================
-socket.on("roundEnd", result => {
-    $("team-a-score").textContent = result.teamAScore;
-    $("team-b-score").textContent = result.teamBScore;
-
-    let summary;
-    if (result.phase === "warmup") {
-        if (result.success) {
-            summary = `🔥 WARMUP: Team ${result.bidderTeam} ne 5/5 liye → Team ${result.bonusTeam} +26`;
-            showMsg(`🏁 WARMUP WIN — Team ${result.bonusTeam} +26`);
-        } else {
-            summary = `💥 WARMUP: Team ${result.bidderTeam} fail → -26`;
-            showMsg(`🏁 WARMUP FAIL — Team ${result.bidderTeam} -26`);
-        }
-    } else {
-        const sign = result.sar >= 0 ? "+" : "";
-        summary = `🎴 MAIN: Team ${result.team} bid ${result.bid}, ${result.tricks} tricks → ${sign}${result.sar}`;
-        showMsg(`🏁 Round — Team ${result.team}: ${result.tricks} tricks, SAR ${sign}${result.sar}`);
-    }
-    addRoundHistory(summary, result.teamAScore, result.teamBScore);
-});
-
-function addRoundHistory(text, aScore, bScore) {
-    const c = $("round-history-list");
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.innerHTML = `<div class="history-text">${text}</div><div class="history-scores">A: ${aScore} | B: ${bScore}</div>`;
-    c.appendChild(div);
-    c.scrollTop = c.scrollHeight;
-}
-
-// ======================================================
-// GAME OVER
-// ======================================================
-socket.on("gameOver", data => {
-    const winnerName = data.winner === "A" ? "Team A" : "Team B";
-    $("winner-team").textContent = `🎉 ${winnerName} Wins!`;
-    $("final-team-a").textContent = data.teamAScore + " SAR";
-    $("final-team-b").textContent = data.teamBScore + " SAR";
-    $("final-row-a").classList.toggle("winner", data.winner === "A");
-    $("final-row-b").classList.toggle("winner", data.winner === "B");
-    $("result-message").textContent = `Team ${data.winner} ne 52 SAR cross kiye!`;
-    show($("game-over-panel"));
-
-    const myTeam = (MY_ID === 1 || MY_ID === 2) ? "A" : "B";
-    if (data.winner === myTeam && !IS_SPECTATOR) {
-        Sound.gameWin(); launchConfetti(); vibrate([200, 100, 200, 100, 400]);
-    } else if (!IS_SPECTATOR) {
-        Sound.gameLose(); vibrate(500);
-    }
-});
-
-$("close-result-btn").onclick = () => hide($("game-over-panel"));
-
-// ======================================================
-// PLAYER STATE
-// ======================================================
-function getSeatElByPlayerId(pid) {
-    const pos = getSeatPosition(pid);
-    if (!pos) return null;
-    return $(`seat-${pos}`);
-}
-
-function setActivePlayer(pid) {
-    document.querySelectorAll(".seat").forEach(el => el.classList.remove("active"));
-    if (!pid) return;
-    const seat = getSeatElByPlayerId(pid);
-    if (seat) seat.classList.add("active");
-}
-
-function clearActivePlayer() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("active")); }
-
-function setTrickLeader(pid) {
-    document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader"));
-    if (!pid) return;
-    const seat = getSeatElByPlayerId(pid);
-    if (seat) seat.classList.add("leader");
-}
-
-function clearActiveLeader() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("leader", "active")); }
-
-function setBidWinner(pid) {
-    document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner"));
-    if (!pid) return;
-    const seat = getSeatElByPlayerId(pid);
-    if (seat) seat.classList.add("bid-winner");
-}
-
-function clearBidWinner() { document.querySelectorAll(".seat").forEach(el => el.classList.remove("bid-winner")); }
-
-function updatePlayerStats(players) {
-    players.forEach(p => {
-        const pos = getSeatPosition(p.id);
-        if (!pos) return;
-        const countEl = $(`${pos}-count`);
-        if (countEl) {
-            const size = p.handSize !== undefined ? p.handSize : p.size;
-            if (size !== undefined) countEl.textContent = size;
-        }
-        const tricksEl = $(`${pos}-tricks`);
-        if (tricksEl && p.tricks !== undefined) tricksEl.textContent = p.tricks;
-    });
-    const myPlayer = players.find(p => p.id === MY_ID);
-    if (myPlayer) {
-        const bottomTricks = $("bottom-tricks");
-        if (bottomTricks && myPlayer.tricks !== undefined) bottomTricks.textContent = myPlayer.tricks;
-    }
-}
-
-function resetAllTricks() {
-    ["top", "left", "right", "bottom"].forEach(pos => {
-        const el = $(`${pos}-tricks`);
-        if (el) el.textContent = "0";
-    });
-}
-
-function renderBidHistory(history) {
-    const c = $("bid-history-list");
-    if (!c) return;
-    c.innerHTML = "";
-    if (!history || history.length === 0) {
-        c.innerHTML = '<div class="bid-empty">No bids yet...</div>';
+function renderBidHistory() {
+    const el = $('bid-history-list');
+    el.innerHTML = '';
+    if (!S.bidHistory || S.bidHistory.length === 0) {
+        el.innerHTML = '<div class="bid-empty">No bids yet</div>';
         return;
     }
-    history.forEach(item => {
-        const d = document.createElement("div");
-        d.className = "bid-item";
-        const parts = item.split(" → ");
-        const player = parts[0] || "?";
-        const action = parts[1] || "";
-        if (action.includes("PASS")) {
-            d.classList.add("pass");
-            if (action.includes("auto")) d.classList.add("auto-pass");
-        } else if (action.includes("Bid")) d.classList.add("bid");
-
-        const ps = document.createElement("span");
-        ps.className = "bid-player";
-        ps.textContent = player;
-
-        const as = document.createElement("span");
-        as.className = "bid-value";
-        as.textContent = action.replace("(auto)", "").replace("⚠️", "").trim();
-
-        d.appendChild(ps); d.appendChild(as);
-        c.appendChild(d);
+    S.bidHistory.forEach(h => {
+        const div = document.createElement('div');
+        div.className = 'bid-item';
+        div.textContent = h;
+        el.appendChild(div);
     });
-    c.scrollTop = c.scrollHeight;
 }
 
-function showMsg(msg) { $("game-message").textContent = msg; }
+function renderCrown() {
+    document.querySelectorAll('.seat').forEach(s => s.classList.remove('bid-winner'));
+    if (S.highestBidderId !== null && S.highestBidderId !== undefined) {
+        const seat = $('seat-' + S.highestBidderId);
+        if (seat) seat.classList.add('bid-winner');
+    }
+}
+
+function renderTeammateHand() {
+    const el = $('teammate-cards-list');
+    el.innerHTML = '';
+    if (!S.revealedHand) return;
+    S.revealedHand.forEach(card => {
+        el.appendChild(makeCardEl(card));
+    });
+    const owner = S.playerNames[S.revealedOwnerId] || 'Partner';
+    $('partner-title').textContent = `👀 Partner — ${owner}`;
+}
+
+/* =========================================================
+   ACTIONS
+   ========================================================= */
+function onPlayCard(idx) {
+    if (S.currentPlayerId !== S.myId) return;
+    socket.emit('playCard', { cardIndex: idx });
+}
+
+$('trump-buttons').addEventListener('click', e => {
+    if (e.target.tagName === 'BUTTON') {
+        const suit = e.target.dataset.suit;
+        socket.emit('chooseTrump', { suit });
+        $('trump-modal').classList.add('hidden');
+    }
+});
+
+$('reveal-yes').addEventListener('click', () => {
+    socket.emit('revealDecision', { decision: 'show' });
+    $('reveal-modal').classList.add('hidden');
+});
+
+$('reveal-no').addEventListener('click', () => {
+    socket.emit('revealDecision', { decision: 'hide' });
+    $('reveal-modal').classList.add('hidden');
+});
+
+$('btn-toggle-reveal').addEventListener('click', () => {
+    socket.emit('toggleReveal');
+    const list = $('teammate-cards-list');
+    const hidden = list.style.visibility === 'hidden';
+    list.style.visibility = hidden ? 'visible' : 'hidden';
+    $('btn-toggle-reveal').textContent = hidden ? '🙈 Hide' : '👀 Show';
+});
+
+$('btn-vote-reset').addEventListener('click', () => {
+    socket.emit('voteRestart');
+});
+
+$('btn-history').addEventListener('click', () => {
+    $('history-panel').classList.remove('hidden');
+});
+
+$('btn-close-history').addEventListener('click', () => {
+    $('history-panel').classList.add('hidden');
+});
+
+$('btn-leave').addEventListener('click', () => {
+    if (confirm('Leave the game?')) {
+        socket.emit('leaveRoom');
+        setTimeout(() => location.reload(), 300);
+    }
+});
+
+$('btn-back-lobby').addEventListener('click', () => {
+    socket.emit('leaveRoom');
+    setTimeout(() => location.reload(), 300);
+});
+
+/* =========================================================
+   MODALS
+   ========================================================= */
+function showRoundEnd(data) {
+    const modal = $('round-end-modal');
+    const trophy = $('round-trophy');
+    const title = $('round-result-title');
+    const sub = $('round-result-sub');
+    const scores = $('round-scores');
+
+    if (data.phase === 'warmup') {
+        if (data.success) {
+            trophy.textContent = '😅';
+            title.textContent = 'Warmup Survived';
+            sub.textContent = `${data.bidderTeam} bid 5 — opponents +26`;
+        } else {
+            trophy.textContent = '💥';
+            title.textContent = 'Warmup Failed';
+            sub.textContent = `${data.bidderTeam} bid 5 and failed — -26`;
+        }
+    } else {
+        if (data.sar >= 0) {
+            trophy.textContent = '🎉';
+            title.textContent = 'Bid Made!';
+            sub.textContent = `${data.team} bid ${data.bid}, won ${data.tricks} tricks (+${data.sar})`;
+        } else {
+            trophy.textContent = '💥';
+            title.textContent = 'Bid Failed!';
+            sub.textContent = `${data.team} bid ${data.bid}, won only ${data.tricks} (${data.sar})`;
+        }
+    }
+
+    scores.innerHTML = `
+        <div class="score-row ${data.teamAScore > data.teamBScore ? 'winner' : ''}">
+            <span class="team-label">Team A</span>
+            <span class="team-score">${data.teamAScore}</span>
+        </div>
+        <div class="score-row ${data.teamBScore > data.teamAScore ? 'winner' : ''}">
+            <span class="team-label">Team B</span>
+            <span class="team-score">${data.teamBScore}</span>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.add('hidden'), 4500);
+}
+
+function showGameOver(data) {
+    const modal = $('game-over-modal');
+    $('game-over-title').textContent = `TEAM ${data.winner} WINS!`;
+    $('game-over-sub').textContent = 'Congratulations!';
+    $('game-over-scores').innerHTML = `
+        <div class="score-row ${data.winner === 'A' ? 'winner' : ''}">
+            <span class="team-label">Team A</span>
+            <span class="team-score">${data.teamAScore}</span>
+        </div>
+        <div class="score-row ${data.winner === 'B' ? 'winner' : ''}">
+            <span class="team-label">Team B</span>
+            <span class="team-score">${data.teamBScore}</span>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+}
