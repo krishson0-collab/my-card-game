@@ -28,8 +28,9 @@ function buildMaps() {
     S.pcMap = { 'pc-top': m.top, 'pc-left': m.left, 'pc-right': m.right, 'pc-bottom': S.myId };
 }
 
-/* LOBBY */
-$('btn-join').addEventListener('click', () => {
+/* ============ LOBBY ============ */
+const btnJoin = $('btn-join');
+if (btnJoin) btnJoin.addEventListener('click', () => {
     const name = $('input-name').value.trim() || 'Player';
     const room = $('input-room').value.trim();
     const pass = $('input-pass').value.trim();
@@ -37,13 +38,15 @@ $('btn-join').addEventListener('click', () => {
     socket.emit('joinRoom', { roomId: room, playerName: name, password: pass || null });
 });
 
-$('btn-bot').addEventListener('click', () => {
+const btnBot = $('btn-bot');
+if (btnBot) btnBot.addEventListener('click', () => {
     const name = $('input-name').value.trim() || 'You';
     const roomId = 'bot_' + Math.random().toString(36).slice(2, 8);
     socket.emit('startBotGame', { roomId, playerName: name });
 });
 
-$('btn-spectate').addEventListener('click', () => {
+const btnSpectate = $('btn-spectate');
+if (btnSpectate) btnSpectate.addEventListener('click', () => {
     const name = $('input-name').value.trim() || 'Spectator';
     const room = $('input-room').value.trim();
     if (!room) return showLobbyMsg('Enter Room ID to spectate');
@@ -51,20 +54,22 @@ $('btn-spectate').addEventListener('click', () => {
 });
 
 function showLobbyMsg(msg) {
-    $('lobby-msg').textContent = msg;
-    setTimeout(() => $('lobby-msg').textContent = '', 3500);
+    const el = $('lobby-msg');
+    if (!el) return;
+    el.textContent = msg;
+    setTimeout(() => el.textContent = '', 3500);
 }
 
-/* SOCKET */
+/* ============ SOCKET ============ */
 socket.on('joined', data => {
     S.myId = data.playerId; S.roomId = data.roomId; S.isSpectator = !!data.isSpectator;
-    $('lobby').classList.add('hidden');
-    $('game').classList.remove('hidden');
+    const lobbyEl = $('lobby'); if (lobbyEl) lobbyEl.classList.add('hidden');
+    const gameEl = $('game'); if (gameEl) gameEl.classList.remove('hidden');
     buildMaps();
     if (S.isSpectator) {
-        $('spectator-banner').classList.remove('hidden');
-        $('my-area').classList.add('hidden');
-        $('bid-ui').classList.remove('active');
+        const sb = $('spectator-banner'); if (sb) sb.classList.remove('hidden');
+        const ma = $('my-area'); if (ma) ma.classList.add('hidden');
+        const bu = $('bid-ui'); if (bu) bu.classList.remove('active');
     }
 });
 
@@ -95,17 +100,14 @@ socket.on('gameStart', data => {
     S.bidHistory = data.bidHistory || [];
     renderBidHistory();
     renderBidBadges();
-    $('teammate-cards').classList.add('hidden');
+    const tc = $('teammate-cards'); if (tc) tc.classList.add('hidden');
     document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active', 'bid-winner', 'leader'));
     renderGame();
     renderAllSeats();
-    
-    // ✅ Initial bid glow
     if (data.currentBidderId && data.currentBidderId !== S.myId) {
         renderBidTurnGlow(data.currentBidderId);
     }
-    
     if (data.currentBidderId === S.myId) renderBidUI();
 });
 
@@ -117,25 +119,24 @@ socket.on('bidUpdate', data => {
     parseBidHistory(S.bidHistory);
     renderBidHistory();
     renderBidBadges();
-
-    // ✅ BID TURN RED GLOW
     if (data.biddingActive && data.nextBidderId) {
         renderBidTurnGlow(data.nextBidderId);
     } else {
         document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     }
-
     if (data.biddingActive && data.nextBidderId === S.myId && !S.isSpectator) renderBidUI();
-    else $('bid-ui').classList.remove('active');
+    else { const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); }
 });
 
 socket.on('biddingFinished', data => {
     S.highestBid = data.highestBid; S.highestBidderId = data.highestBidderId;
     S.biddingActive = false;
-    $('bid-ui').classList.remove('active');
+    const bu = $('bid-ui'); if (bu) bu.classList.remove('active');
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     renderCrown();
-    if (data.highestBidderId === S.myId && !S.isSpectator) $('trump-modal').classList.remove('hidden');
+    if (data.highestBidderId === S.myId && !S.isSpectator) {
+        const tm = $('trump-modal'); if (tm) tm.classList.remove('hidden');
+    }
 });
 
 socket.on('warmupSkipped', () => {});
@@ -144,7 +145,7 @@ socket.on('trumpSet', data => {
     S.trumpSuit = data.trumpSuit; S.highestBidderId = data.highestBidderId;
     updateTrumpIndicator();
     if (data.waitReveal && data.highestBidderId === S.myId && !S.isSpectator) {
-        $('reveal-modal').classList.remove('hidden');
+        const rm = $('reveal-modal'); if (rm) rm.classList.remove('hidden');
     }
 });
 
@@ -164,7 +165,7 @@ socket.on('roundStarted', data => {
     document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
     data.handSizes.forEach(h => { S.handSizes[h.id] = h.size; S.tricks[h.id] = h.tricks; });
     if (S.revealedHand && S.revealedHand.length > 0) {
-        $('teammate-cards').classList.remove('hidden');
+        const tc = $('teammate-cards'); if (tc) tc.classList.remove('hidden');
         renderTeammateHand();
     }
     updateTrumpIndicator();
@@ -217,7 +218,7 @@ socket.on('revealedHandUpdate', data => {
     S.revealedHand = data.revealedHand;
     S.revealedOwnerId = data.revealedOwnerId;
     if (S.revealedHand && S.revealedHand.length > 0) {
-        $('teammate-cards').classList.remove('hidden');
+        const tc = $('teammate-cards'); if (tc) tc.classList.remove('hidden');
         renderTeammateHand();
     }
 });
@@ -225,10 +226,10 @@ socket.on('revealedHandUpdate', data => {
 socket.on('roundEnd', data => showRoundEnd(data));
 socket.on('gameOver', data => showGameOver(data));
 socket.on('gameRestarted', () => {
-    $('game-over-modal').classList.add('hidden');
-    $('round-end-modal').classList.add('hidden');
+    const go = $('game-over-modal'); if (go) go.classList.add('hidden');
+    const re = $('round-end-modal'); if (re) re.classList.add('hidden');
 });
-socket.on('restartVotesUpdate', data => { $('vote-badge').textContent = data.total; });
+socket.on('restartVotesUpdate', data => { const el = $('vote-badge'); if (el) el.textContent = data.total; });
 socket.on('errorMsg', msg => console.warn('Server error:', msg));
 socket.on('playerLeft', data => console.log(data.playerName + ' left'));
 socket.on('spectatorJoined', data => {
@@ -241,7 +242,7 @@ socket.on('spectatorJoined', data => {
     renderGame();
 });
 
-/* Position helpers */
+/* ============ HELPERS ============ */
 function findPcSlotForPlayer(pid) {
     if (pid === S.myId) return 'pc-bottom';
     for (const slot in S.pcMap) {
@@ -271,19 +272,26 @@ function renderAllSeats() {
     });
 }
 
-/* RENDERING */
+/* ============ RENDERING ============ */
 function renderGame() {
     renderMyHand(); renderScores(); renderTurnIndicator();
     updateTrumpIndicator(); renderCrown(); renderLeaderStar();
-    $('phase-label').textContent = S.phase === 'warmup' ? 'WARMUP' : 'MAIN';
+    const phaseEl = $('phase-label');
+    if (phaseEl) phaseEl.textContent = S.phase === 'warmup' ? 'WARMUP' : 'MAIN';
     const myTricks = S.tricks[S.myId] || 0;
-    $('tricks-label').textContent = `${myTricks}/${S.totalTricks}`;
-    if (S.playerNames[S.myId]) $('my-name').textContent = S.playerNames[S.myId];
+    const trickEl = $('tricks-label');
+    if (trickEl) trickEl.textContent = `${myTricks}/${S.totalTricks}`;
+    if (S.playerNames[S.myId]) {
+        const myNameEl = $('my-name');
+        if (myNameEl) myNameEl.textContent = S.playerNames[S.myId];
+    }
 }
 
 function renderMyHand() {
     if (S.isSpectator) return;
-    const el = $('player1-cards'); el.innerHTML = '';
+    const el = $('player1-cards');
+    if (!el) return;
+    el.innerHTML = '';
     S.myHand.forEach((card, idx) => {
         const cardEl = makeCardEl(card);
         cardEl.dataset.idx = idx;
@@ -301,17 +309,18 @@ function makeCardEl(card) {
 }
 
 function renderScores() {
-    $('score-a').textContent = S.teamAScore; $('score-b').textContent = S.teamBScore;
+    const aEl = $('score-a'); if (aEl) aEl.textContent = S.teamAScore;
+    const bEl = $('score-b'); if (bEl) bEl.textContent = S.teamBScore;
     renderAllSeats();
-    $('my-tricks').textContent = S.tricks[S.myId] || 0;
-    $('tricks-label').textContent = `${S.tricks[S.myId] || 0}/${S.totalTricks}`;
+    const myTrickEl = $('my-tricks'); if (myTrickEl) myTrickEl.textContent = S.tricks[S.myId] || 0;
+    const trickEl = $('tricks-label'); if (trickEl) trickEl.textContent = `${S.tricks[S.myId] || 0}/${S.totalTricks}`;
 }
 
 function renderTurnIndicator() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     if (S.currentPlayerId && S.currentPlayerId !== S.myId) {
         const seatId = findSeatForPlayer(S.currentPlayerId);
-        if (seatId) $(seatId).classList.add('active');
+        if (seatId) { const el = $(seatId); if (el) el.classList.add('active'); }
     }
     highlightPlayable();
 }
@@ -320,10 +329,7 @@ function renderBidTurnGlow(bidderId) {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     if (bidderId && bidderId !== S.myId) {
         const seatId = findSeatForPlayer(bidderId);
-        if (seatId) {
-            const seat = $(seatId);
-            if (seat) seat.classList.add('active');
-        }
+        if (seatId) { const el = $(seatId); if (el) el.classList.add('active'); }
     }
 }
 
@@ -331,7 +337,7 @@ function renderLeaderStar() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('leader'));
     if (S.leadPlayerId !== null && S.leadPlayerId !== S.myId) {
         const seatId = findSeatForPlayer(S.leadPlayerId);
-        if (seatId) $(seatId).classList.add('leader');
+        if (seatId) { const el = $(seatId); if (el) el.classList.add('leader'); }
     }
 }
 
@@ -344,51 +350,76 @@ function highlightPlayable() {
 
 function updateTrumpIndicator() {
     const el = $('trump-indicator');
+    if (!el) return;
     if (!S.trumpSuit) {
-        el.classList.add('empty'); $('trump-icon').textContent = '?'; $('trump-name-small').textContent = 'No Trump';
+        el.classList.add('empty');
+        const iconEl = $('trump-icon'); if (iconEl) iconEl.textContent = '?';
+        const nameEl = $('trump-name-small'); if (nameEl) nameEl.textContent = 'No Trump';
     } else {
-        el.classList.remove('empty'); $('trump-icon').textContent = S.trumpSuit;
-        $('trump-name-small').textContent = S.playerNames[S.highestBidderId] || 'Trump';
+        el.classList.remove('empty');
+        const iconEl = $('trump-icon'); if (iconEl) iconEl.textContent = S.trumpSuit;
+        const nameEl = $('trump-name-small');
+        if (nameEl) nameEl.textContent = S.playerNames[S.highestBidderId] || 'Trump';
     }
 }
 
 function renderBidUI() {
-    const container = $(''); container.innerHTML = '';
+    let container = $('main-bid-buttons');
+    if (!container) {
+        console.warn('⚠️ main-bid-buttons not found — creating...');
+        const bidUI = $('bid-ui');
+        if (!bidUI) { console.error('❌ bid-ui missing'); return; }
+        container = document.createElement('div');
+        container.id = 'main-bid-buttons';
+        bidUI.appendChild(container);
+    }
+    container.innerHTML = '';
+
+    const infoEl = $('bid-turn-info');
+
     if (S.phase === 'warmup') {
         const bidBtn = document.createElement('button');
         bidBtn.textContent = 'Bid 5';
-        bidBtn.onclick = () => { socket.emit('bid', { bid: 5 }); $('bid-ui').classList.remove('active'); };
+        bidBtn.onclick = () => { socket.emit('bid', { bid: 5 }); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
         container.appendChild(bidBtn);
+
         const passBtn = document.createElement('button');
         passBtn.textContent = 'PASS'; passBtn.className = 'pass-btn';
-        passBtn.onclick = () => { socket.emit('pass'); $('bid-ui').classList.remove('active'); };
+        passBtn.onclick = () => { socket.emit('pass'); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
         container.appendChild(passBtn);
-        $('bid-turn-info').textContent = 'Warmup — Bid 5 or Pass';
+
+        if (infoEl) infoEl.textContent = 'Warmup — Bid 5 or Pass';
     } else {
         const startBid = Math.max(8, S.currentBid + 1);
         for (let v = startBid; v <= 13; v++) {
             const btn = document.createElement('button');
             btn.textContent = v;
-            btn.onclick = () => { socket.emit('bid', { bid: v }); $('bid-ui').classList.remove('active'); };
+            btn.onclick = () => { socket.emit('bid', { bid: v }); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
             container.appendChild(btn);
         }
         const passBtn = document.createElement('button');
         passBtn.textContent = 'PASS'; passBtn.className = 'pass-btn';
-        passBtn.onclick = () => { socket.emit('pass'); $('bid-ui').classList.remove('active'); };
+        passBtn.onclick = () => { socket.emit('pass'); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
         container.appendChild(passBtn);
-        $('bid-turn-info').textContent = `Bid above ${S.currentBid}`;
+
+        if (infoEl) infoEl.textContent = `Bid above ${S.currentBid}`;
     }
-    $('bid-ui').classList.add('active');
+
+    const bu = $('bid-ui'); if (bu) bu.classList.add('active');
 }
 
 function renderBidHistory() {
-    const el = $('bid-history-list'); el.innerHTML = '';
+    const el = $('bid-history-list');
+    if (!el) return;
+    el.innerHTML = '';
     if (!S.bidHistory || S.bidHistory.length === 0) {
-        el.innerHTML = '<div class="bid-empty">No bids yet</div>'; return;
+        el.innerHTML = '<div class="bid-empty">No bids yet</div>';
+        return;
     }
     S.bidHistory.forEach(h => {
         const div = document.createElement('div');
-        div.className = 'bid-item'; div.textContent = h;
+        div.className = 'bid-item';
+        div.textContent = h;
         el.appendChild(div);
     });
 }
@@ -398,7 +429,8 @@ function parseBidHistory(history) {
     history.forEach(entry => {
         const parts = entry.split(' → ');
         if (parts.length < 2) return;
-        const name = parts[0].trim(); const val = parts[1].trim();
+        const name = parts[0].trim();
+        const val = parts[1].trim();
         let foundId = null;
         for (const id in S.playerNames) {
             if (S.playerNames[id] === name) { foundId = id; break; }
@@ -441,19 +473,22 @@ function renderCrown() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('bid-winner'));
     if (S.highestBidderId !== null && S.highestBidderId !== S.myId) {
         const seatId = findSeatForPlayer(S.highestBidderId);
-        if (seatId) $(seatId).classList.add('bid-winner');
+        if (seatId) { const el = $(seatId); if (el) el.classList.add('bid-winner'); }
     }
 }
 
 function renderTeammateHand() {
-    const el = $('teammate-cards-list'); el.innerHTML = '';
+    const el = $('teammate-cards-list');
+    if (!el) return;
+    el.innerHTML = '';
     if (!S.revealedHand) return;
     S.revealedHand.forEach(card => { el.appendChild(makeCardEl(card)); });
     const owner = S.playerNames[S.revealedOwnerId] || 'Partner';
-    $('partner-title').textContent = `👀 Partner — ${owner}`;
+    const titleEl = $('partner-title');
+    if (titleEl) titleEl.textContent = `👀 Partner — ${owner}`;
 }
 
-/* ACTIONS */
+/* ============ ACTIONS ============ */
 function onPlayCard(idx) {
     if (S.currentPlayerId !== S.myId) return;
     if (S.isPlayingCard) return;
@@ -464,36 +499,48 @@ function onPlayCard(idx) {
     setTimeout(() => { S.isPlayingCard = false; }, 1000);
 }
 
-$('trump-buttons').addEventListener('click', e => {
+const trumpBtns = $('trump-buttons');
+if (trumpBtns) trumpBtns.addEventListener('click', e => {
     if (e.target.tagName === 'BUTTON') {
         socket.emit('chooseTrump', { suit: e.target.dataset.suit });
-        $('trump-modal').classList.add('hidden');
+        const tm = $('trump-modal'); if (tm) tm.classList.add('hidden');
     }
 });
 
-$('reveal-yes').addEventListener('click', () => {
+const revealYes = $('reveal-yes');
+if (revealYes) revealYes.addEventListener('click', () => {
     socket.emit('revealDecision', { decision: 'show' });
-    $('reveal-modal').classList.add('hidden');
+    const rm = $('reveal-modal'); if (rm) rm.classList.add('hidden');
 });
 
-$('reveal-no').addEventListener('click', () => {
+const revealNo = $('reveal-no');
+if (revealNo) revealNo.addEventListener('click', () => {
     socket.emit('revealDecision', { decision: 'hide' });
-    $('reveal-modal').classList.add('hidden');
+    const rm = $('reveal-modal'); if (rm) rm.classList.add('hidden');
 });
 
-$('btn-toggle-reveal').addEventListener('click', () => {
+const toggleRevBtn = $('btn-toggle-reveal');
+if (toggleRevBtn) toggleRevBtn.addEventListener('click', () => {
     socket.emit('toggleReveal');
     const list = $('teammate-cards-list');
+    if (!list) return;
     const hidden = list.style.visibility === 'hidden';
     list.style.visibility = hidden ? 'visible' : 'hidden';
-    $('btn-toggle-reveal').textContent = hidden ? '🙈 Hide' : '👀 Show';
+    const btn = $('btn-toggle-reveal');
+    if (btn) btn.textContent = hidden ? '🙈 Hide' : '👀 Show';
 });
 
-$('btn-vote-reset').addEventListener('click', () => socket.emit('voteRestart'));
-$('btn-history').addEventListener('click', () => $('history-panel').classList.remove('hidden'));
-$('btn-close-history').addEventListener('click', () => $('history-panel').classList.add('hidden'));
+const voteReset = $('btn-vote-reset');
+if (voteReset) voteReset.addEventListener('click', () => socket.emit('voteRestart'));
 
-$('btn-clear-history').addEventListener('click', () => {
+const historyBtn = $('btn-history');
+if (historyBtn) historyBtn.addEventListener('click', () => { const h = $('history-panel'); if (h) h.classList.remove('hidden'); });
+
+const closeHistory = $('btn-close-history');
+if (closeHistory) closeHistory.addEventListener('click', () => { const h = $('history-panel'); if (h) h.classList.add('hidden'); });
+
+const clearHistory = $('btn-clear-history');
+if (clearHistory) clearHistory.addEventListener('click', () => {
     if (confirm('Clear all history?')) {
         S.bidHistory = []; S.playerBids = {};
         renderBidHistory(); renderBidBadges();
@@ -502,16 +549,20 @@ $('btn-clear-history').addEventListener('click', () => {
     }
 });
 
-$('btn-leave').addEventListener('click', () => {
+const leaveBtn = $('btn-leave');
+if (leaveBtn) leaveBtn.addEventListener('click', () => {
     if (confirm('Leave the game?')) { socket.emit('leaveRoom'); setTimeout(() => location.reload(), 300); }
 });
-$('btn-back-lobby').addEventListener('click', () => {
+
+const backLobby = $('btn-back-lobby');
+if (backLobby) backLobby.addEventListener('click', () => {
     socket.emit('leaveRoom'); setTimeout(() => location.reload(), 300);
 });
 
-/* MODALS */
+/* ============ MODALS ============ */
 function showRoundEnd(data) {
     const modal = $('round-end-modal');
+    if (!modal) return;
     const trophy = $('round-trophy');
     const title = $('round-result-title');
     const sub = $('round-result-sub');
@@ -519,46 +570,58 @@ function showRoundEnd(data) {
 
     if (data.phase === 'warmup') {
         if (data.success) {
-            trophy.textContent = '😅'; title.textContent = 'Warmup Survived';
-            sub.textContent = `${data.bidderTeam} bid 5 — opponents +26`;
+            if (trophy) trophy.textContent = '😅';
+            if (title) title.textContent = 'Warmup Survived';
+            if (sub) sub.textContent = `${data.bidderTeam} bid 5 — opponents +26`;
         } else {
-            trophy.textContent = '💥'; title.textContent = 'Warmup Failed';
-            sub.textContent = `${data.bidderTeam} bid 5 and failed — -26`;
+            if (trophy) trophy.textContent = '💥';
+            if (title) title.textContent = 'Warmup Failed';
+            if (sub) sub.textContent = `${data.bidderTeam} bid 5 and failed — -26`;
         }
     } else {
         if (data.bidBroken) {
-            trophy.textContent = '💥'; title.textContent = 'Bid Broken!';
-            sub.textContent = `${data.team} bid ${data.bid} — opponents broke it (${data.sar})`;
+            if (trophy) trophy.textContent = '💥';
+            if (title) title.textContent = 'Bid Broken!';
+            if (sub) sub.textContent = `${data.team} bid ${data.bid} — opponents broke it (${data.sar})`;
         } else if (data.sar >= 0) {
-            trophy.textContent = '🎉'; title.textContent = 'Bid Made!';
-            sub.textContent = `${data.team} bid ${data.bid}, won ${data.tricks} tricks (+${data.sar})`;
+            if (trophy) trophy.textContent = '🎉';
+            if (title) title.textContent = 'Bid Made!';
+            if (sub) sub.textContent = `${data.team} bid ${data.bid}, won ${data.tricks} tricks (+${data.sar})`;
         } else {
-            trophy.textContent = '💥'; title.textContent = 'Bid Failed!';
-            sub.textContent = `${data.team} bid ${data.bid}, won only ${data.tricks} (${data.sar})`;
+            if (trophy) trophy.textContent = '💥';
+            if (title) title.textContent = 'Bid Failed!';
+            if (sub) sub.textContent = `${data.team} bid ${data.bid}, won only ${data.tricks} (${data.sar})`;
         }
     }
-    scores.innerHTML = `
-        <div class="score-row ${data.teamAScore > data.teamBScore ? 'winner' : ''}">
-            <span class="team-label">Team A</span><span class="team-score">${data.teamAScore}</span>
-        </div>
-        <div class="score-row ${data.teamBScore > data.teamAScore ? 'winner' : ''}">
-            <span class="team-label">Team B</span><span class="team-score">${data.teamBScore}</span>
-        </div>`;
+    if (scores) {
+        scores.innerHTML = `
+            <div class="score-row ${data.teamAScore > data.teamBScore ? 'winner' : ''}">
+                <span class="team-label">Team A</span><span class="team-score">${data.teamAScore}</span>
+            </div>
+            <div class="score-row ${data.teamBScore > data.teamAScore ? 'winner' : ''}">
+                <span class="team-label">Team B</span><span class="team-score">${data.teamBScore}</span>
+            </div>`;
+    }
     modal.classList.remove('hidden');
     setTimeout(() => modal.classList.add('hidden'), 4500);
 }
 
 function showGameOver(data) {
-    $('game-over-title').textContent = `TEAM ${data.winner} WINS!`;
-    $('game-over-sub').textContent = 'Congratulations!';
-    $('game-over-scores').innerHTML = `
-        <div class="score-row ${data.winner === 'A' ? 'winner' : ''}">
-            <span class="team-label">Team A</span><span class="team-score">${data.teamAScore}</span>
-        </div>
-        <div class="score-row ${data.winner === 'B' ? 'winner' : ''}">
-            <span class="team-label">Team B</span><span class="team-score">${data.teamBScore}</span>
-        </div>`;
-    $('game-over-modal').classList.remove('hidden');
+    const titleEl = $('game-over-title');
+    const subEl = $('game-over-sub');
+    const scoresEl = $('game-over-scores');
+    if (titleEl) titleEl.textContent = `TEAM ${data.winner} WINS!`;
+    if (subEl) subEl.textContent = 'Congratulations!';
+    if (scoresEl) {
+        scoresEl.innerHTML = `
+            <div class="score-row ${data.winner === 'A' ? 'winner' : ''}">
+                <span class="team-label">Team A</span><span class="team-score">${data.teamAScore}</span>
+            </div>
+            <div class="score-row ${data.winner === 'B' ? 'winner' : ''}">
+                <span class="team-label">Team B</span><span class="team-score">${data.teamBScore}</span>
+            </div>`;
+    }
+    const gm = $('game-over-modal'); if (gm) gm.classList.remove('hidden');
 }
 
 function showToast(msg, duration = 2000) {
