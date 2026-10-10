@@ -9,10 +9,25 @@ const S = {
     handSizes: {}, tricks: {}, revealedHand: null, revealedOwnerId: null,
     bidWinnerId: null, teamAScore: 0, teamBScore: 0, totalTricks: 5,
     playerNames: {}, playerTeams: {}, bidHistory: [], playerBids: {},
-    isPlayingCard: false, cardJustPlayed: false, lastResolvedTrick: -1
+    isPlayingCard: false, cardJustPlayed: false, lastResolvedTrick: -1,
+    seatMap: {}, pcMap: {}
 };
 
 const $ = id => document.getElementById(id);
+
+/* Position mapping — har viewer ke perspective se */
+const SEAT_MAP = {
+    1: { top: 2, left: 3, right: 4 },
+    2: { top: 1, left: 4, right: 3 },
+    3: { top: 4, left: 2, right: 1 },
+    4: { top: 3, left: 1, right: 2 }
+};
+
+function buildMaps() {
+    const m = SEAT_MAP[S.myId] || SEAT_MAP[1];
+    S.seatMap = { 'seat-top': m.top, 'seat-left': m.left, 'seat-right': m.right };
+    S.pcMap = { 'pc-top': m.top, 'pc-left': m.left, 'pc-right': m.right, 'pc-bottom': S.myId };
+}
 
 /* LOBBY */
 $('btn-join').addEventListener('click', () => {
@@ -46,6 +61,7 @@ socket.on('joined', data => {
     S.myId = data.playerId; S.roomId = data.roomId; S.isSpectator = !!data.isSpectator;
     $('lobby').classList.add('hidden');
     $('game').classList.remove('hidden');
+    buildMaps();
     if (S.isSpectator) {
         $('spectator-banner').classList.remove('hidden');
         $('my-area').classList.add('hidden');
@@ -56,26 +72,11 @@ socket.on('joined', data => {
 socket.on('joinError', msg => showLobbyMsg(msg));
 
 socket.on('roomUpdate', data => {
-    const nameCount = {};
-    data.players.forEach(p => { if (p.connected) nameCount[p.name] = (nameCount[p.name] || 0) + 1; });
-
     data.players.forEach(p => {
-        S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
-        const seat = $('seat-' + p.id);
-        if (seat) {
-            const nameEl = seat.querySelector('.pb-name');
-            if (nameEl) {
-                let displayName = p.name;
-                if (nameCount[p.name] > 1) displayName = `${p.name} (P${p.id})`;
-                nameEl.textContent = displayName;
-            }
-        }
+        S.playerNames[p.id] = p.name;
+        S.playerTeams[p.id] = p.team;
     });
-    if (S.myId && S.playerNames[S.myId]) {
-        let myDisplay = S.playerNames[S.myId];
-        if (nameCount[myDisplay] > 1) myDisplay = `${myDisplay} (You)`;
-        $('my-name').textContent = myDisplay;
-    }
+    renderAllSeats();
 });
 
 socket.on('gameStart', data => {
@@ -87,6 +88,7 @@ socket.on('gameStart', data => {
     S.bidWinnerId = null; S.trumpSuit = null;
     S.playerBids = {}; S.leadPlayerId = null;
     S.isPlayingCard = false; S.cardJustPlayed = false; S.lastResolvedTrick = -1;
+    buildMaps();
     data.players.forEach(p => {
         S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
         S.handSizes[p.id] = p.handSize; S.tricks[p.id] = p.tricks;
@@ -98,6 +100,7 @@ socket.on('gameStart', data => {
     document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active', 'bid-winner', 'leader'));
     renderGame();
+    renderAllSeats();
     if (data.currentBidderId === S.myId) renderBidUI();
 });
 
@@ -158,8 +161,11 @@ socket.on('roundStarted', data => {
 });
 
 socket.on('cardPlayed', data => {
-    const slot = $('pc-' + data.playerId);
-    if (slot) { slot.innerHTML = ''; slot.appendChild(makeCardEl(data.card)); }
+    const slot = findPcSlotForPlayer(data.playerId);
+    if (slot) {
+        const slotEl = $(slot);
+        if (slotEl) { slotEl.innerHTML = ''; slotEl.appendChild(makeCardEl(data.card)); }
+    }
     if (data.playerId === S.myId) S.isPlayingCard = false;
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
@@ -180,7 +186,6 @@ socket.on('trickResolved', data => {
     S.cardJustPlayed = false;
     S.isPlayingCard = false;
     if (data.bidBroken) showToast('💥 Bid Broken!', 1500);
-
     const thisTrick = data.trickNumber;
     S.lastResolvedTrick = thisTrick;
     setTimeout(() => {
@@ -188,7 +193,6 @@ socket.on('trickResolved', data => {
             document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
         }
     }, 800);
-
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
     renderTurnIndicator();
@@ -223,6 +227,36 @@ socket.on('spectatorJoined', data => {
     renderGame();
 });
 
+/* Position-based helpers */
+function findPcSlotForPlayer(pid) {
+    if (pid === S.myId) return 'pc-bottom';
+    for (const slot in S.pcMap) {
+        if (S.pcMap[slot] === pid) return slot;
+    }
+    return null;
+}
+
+function findSeatForPlayer(pid) {
+    if (pid === S.myId) return null;
+    for (const seat in S.seatMap) {
+        if (S.seatMap[seat] === pid) return seat;
+    }
+    return null;
+}
+
+function renderAllSeats() {
+    ['seat-top', 'seat-left', 'seat-right'].forEach(seatId => {
+        const pid = S.seatMap[seatId];
+        if (!pid) return;
+        const seatEl = $(seatId);
+        if (!seatEl) return;
+        const nameEl = seatEl.querySelector('.pb-name');
+        if (nameEl) nameEl.textContent = S.playerNames[pid] || 'Waiting';
+        const badge = seatEl.querySelector('.score-badge');
+        if (badge) badge.textContent = `${S.tricks[pid] || 0}/${S.totalTricks}`;
+    });
+}
+
 /* RENDERING */
 function renderGame() {
     renderMyHand(); renderScores(); renderTurnIndicator();
@@ -254,11 +288,7 @@ function makeCardEl(card) {
 
 function renderScores() {
     $('score-a').textContent = S.teamAScore; $('score-b').textContent = S.teamBScore;
-    [1,2,3,4].forEach(id => {
-        const seat = $('seat-' + id); if (!seat) return;
-        const badge = seat.querySelector('.score-badge');
-        if (badge) badge.textContent = `${S.tricks[id] || 0}/${S.totalTricks}`;
-    });
+    renderAllSeats();
     $('my-tricks').textContent = S.tricks[S.myId] || 0;
     $('tricks-label').textContent = `${S.tricks[S.myId] || 0}/${S.totalTricks}`;
 }
@@ -266,17 +296,17 @@ function renderScores() {
 function renderTurnIndicator() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     if (S.currentPlayerId && S.currentPlayerId !== S.myId) {
-        const seat = $('seat-' + S.currentPlayerId);
-        if (seat) seat.classList.add('active');
+        const seatId = findSeatForPlayer(S.currentPlayerId);
+        if (seatId) $(seatId).classList.add('active');
     }
     highlightPlayable();
 }
 
 function renderLeaderStar() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('leader'));
-    if (S.leadPlayerId !== null && S.leadPlayerId !== undefined) {
-        const seat = $('seat-' + S.leadPlayerId);
-        if (seat) seat.classList.add('leader');
+    if (S.leadPlayerId !== null && S.leadPlayerId !== S.myId) {
+        const seatId = findSeatForPlayer(S.leadPlayerId);
+        if (seatId) $(seatId).classList.add('leader');
     }
 }
 
@@ -356,9 +386,13 @@ function parseBidHistory(history) {
 
 function renderBidBadges() {
     document.querySelectorAll('.bid-badge').forEach(b => b.remove());
-    [1, 2, 3, 4].forEach(id => {
-        const seat = $('seat-' + id); if (!seat) return;
-        const bid = S.playerBids[id]; if (!bid) return;
+    ['seat-top', 'seat-left', 'seat-right'].forEach(seatId => {
+        const pid = S.seatMap[seatId];
+        if (!pid) return;
+        const bid = S.playerBids[pid];
+        if (!bid) return;
+        const seat = $(seatId);
+        if (!seat) return;
         const badge = document.createElement('div');
         badge.className = 'bid-badge ' + (bid === 'PASS' ? 'pass' : 'bid');
         badge.textContent = bid === 'PASS' ? '✕' : bid;
@@ -380,9 +414,9 @@ function renderBidBadges() {
 
 function renderCrown() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('bid-winner'));
-    if (S.highestBidderId !== null && S.highestBidderId !== undefined) {
-        const seat = $('seat-' + S.highestBidderId);
-        if (seat) seat.classList.add('bid-winner');
+    if (S.highestBidderId !== null && S.highestBidderId !== S.myId) {
+        const seatId = findSeatForPlayer(S.highestBidderId);
+        if (seatId) $(seatId).classList.add('bid-winner');
     }
 }
 

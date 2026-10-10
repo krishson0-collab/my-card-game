@@ -1,5 +1,5 @@
-const express = require("express");
-const http = require("http");
+const: express = require("express");
+const http null = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
 
@@ -9,14 +9,15 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.static(path.join(__dirname, "public")));
 
+// ======================================================
+// CONSTANTS
+// ======================================================
 const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 const RANK_VALUE = { "2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"10":10,"J":11,"Q":12,"K":13,"A":14 };
 
-// ✅ Turn order: P1 → P4 → P2 → P3 (right-hand)
-const RIGHT_HAND_ORDER = [0, 3, 1, 2];
-// ✅ Deal order: same right-hand
-const RIGHT_HAND_DEAL_ORDER = [0, 3, 1, 2];
+const RIGHT_HAND_ORDER = [0, 3, 1, 2];          // Turn order: P1 → P4 → P2 → P3
+const RIGHT_HAND_DEAL_ORDER = [0, 3, 1, 2];     // Deal order: same
 
 const TEAMMATES = { 1: 2, 2: 1, 3: 4, 4: 3 };
 const TEAMS = { A: [1, 2], B: [3, 4] };
@@ -36,6 +37,9 @@ const MAIN_TRICKS = 13;
 const REVEAL_THRESHOLD = 9;
 const WIN_SCORE = 52;
 
+// ======================================================
+// HELPERS
+// ======================================================
 function nextIndex(i) {
     const pos = RIGHT_HAND_ORDER.indexOf(i);
     return RIGHT_HAND_ORDER[(pos + 1) % 4];
@@ -63,7 +67,7 @@ function sortHand(hand) {
     });
 }
 
-// ✅ RIGHT-HAND DEAL helper — ek-ek card har player ko
+// ✅ RIGHT-HAND DEAL — ek-ek card har player ko right-hand order me
 function dealRoundRobin(room, deck, cardsPerPlayer) {
     let idx = 0;
     for (let c = 0; c < cardsPerPlayer; c++) {
@@ -74,6 +78,9 @@ function dealRoundRobin(room, deck, cardsPerPlayer) {
     }
 }
 
+// ======================================================
+// ROOMS
+// ======================================================
 const rooms = {};
 
 function createRoom(roomId, password) {
@@ -82,7 +89,7 @@ function createRoom(roomId, password) {
         players: [
             { id: 1, name: "Player 1", team: "A", hand: [], tricks: 0, socketId: null, connected: false, isBot: false },
             { id: 2, name: "Player 2", team: "A", hand: [], tricks: 0, socketId: null, connected: false, isBot: false },
-            { id: 3, name: "Player 3", team: "B", hand: [], tricks: 0, socketId: null, connected: false, isBot: false },
+            { id: 3, name: "Player 3", team: "B", hand: [], tricks: , connected: false, isBot: false },
             { id: 4, name: "Player 4", team: "B", hand: [], tricks: 0, socketId: null, connected: false, isBot: false }
         ],
         currentBid: MAIN_START_BID, highestBid: MAIN_START_BID, highestBidder: null,
@@ -94,7 +101,9 @@ function createRoom(roomId, password) {
     };
 }
 
-// ✅ Warmup deal — RIGHT HAND order
+// ======================================================
+// DEAL
+// ======================================================
 function dealWarmup(room) {
     const deck = shuffle(createDeck());
     room.phase = PHASE_WARMUP;
@@ -104,7 +113,6 @@ function dealWarmup(room) {
     resetRoundState(room, WARMUP_BID - 1);
 }
 
-// ✅ Main from warmup — RIGHT HAND order
 function dealMainFromWarmup(room) {
     const usedCards = new Set();
     room.players.forEach(p => p.hand.forEach(c => usedCards.add(c.rank + c.suit)));
@@ -115,7 +123,6 @@ function dealMainFromWarmup(room) {
     resetRoundState(room, MAIN_START_BID);
 }
 
-// ✅ Fresh main deal — RIGHT HAND order
 function dealMainFresh(room) {
     const deck = shuffle(createDeck());
     room.phase = PHASE_MAIN;
@@ -135,6 +142,9 @@ function resetRoundState(room, startingBid) {
 
 function getCurrentBidderIndex(room) { return RIGHT_HAND_ORDER[room.currentBidderIndex]; }
 
+// ======================================================
+// BIDDING
+// ======================================================
 function handleBid(room, playerId, bid) {
     if (!room.biddingActive) return { error: "Bidding closed" };
     if (playerId - 1 !== getCurrentBidderIndex(room)) return { error: "Not your turn" };
@@ -185,6 +195,9 @@ function advanceMainBidder(room) {
     room.currentBidderIndex = (room.currentBidderIndex + 1) % 4;
 }
 
+// ======================================================
+// TRUMP & REVEAL
+// ======================================================
 function handleTrump(room, playerId, suit) {
     if (room.highestBidder !== playerId - 1) return { error: "Not trump holder" };
     if (!SUITS.includes(suit)) return { error: "Invalid suit" };
@@ -203,6 +216,9 @@ function handleRevealDecision(room, playerId, decision) {
     return { ok: true };
 }
 
+// ======================================================
+// CARD PLAY
+// ======================================================
 function startCardRound(room) {
     room.roundStarted = true;
     room.currentPlayerIndex = room.highestBidder;
@@ -224,6 +240,7 @@ function handlePlayCard(room, playerId, cardIndex) {
     if (!room.roundStarted) return { error: "Round not started" };
     const idx = playerId - 1;
     if (room.currentPlayerIndex !== idx) return { error: "Not your turn" };
+    // ✅ Duplicate check
     if (room.trickCards.some(tc => tc.playerIndex === idx)) return { error: "Already played this trick" };
     const player = room.players[idx];
     const card = player.hand[cardIndex];
@@ -237,6 +254,7 @@ function handlePlayCard(room, playerId, cardIndex) {
     return { ok: true };
 }
 
+// ✅ BID BREAK — opponent enough tricks le toh round end
 function isBidBroken(room) {
     if (room.phase !== PHASE_MAIN) return false;
     if (room.highestBidder === null || room.highestBidder === undefined) return false;
@@ -297,6 +315,9 @@ function beats(room, challenger, current) {
     return false;
 }
 
+// ======================================================
+// ROUND END
+// ======================================================
 function finishWarmup(room) {
     room.roundStarted = false;
     const bidderTeam = room.players[room.highestBidder].team;
@@ -332,6 +353,9 @@ function finishMain(room) {
     return { phase: PHASE_MAIN, team: bidderTeam, tricks: tricksWon, bid: room.highestBid, sar, teamAScore: room.teamAScore, teamBScore: room.teamBScore, gameOver: room.gameEnded };
 }
 
+// ======================================================
+// BROADCAST
+// ======================================================
 function sendGameStart(room) {
     if (!room || !room.players) return;
     room.players.forEach(p => {
@@ -411,6 +435,9 @@ function broadcastRevealedHandUpdate(room) {
     } catch (e) { console.error("broadcastRevealedHandUpdate:", e.message); }
 }
 
+// ======================================================
+// BOT AI
+// ======================================================
 function scheduleBotAction(room) {
     if (!room || !room.players) return;
     if (room.biddingActive) {
@@ -557,60 +584,101 @@ function botPlay(room, bot) {
     } else setTimeout(() => scheduleBotAction(room), 600);
 }
 
+// ======================================================
+// SOCKET
+// ======================================================
 io.on("connection", socket => {
+
+    // JOIN ROOM
     socket.on("joinRoom", ({ roomId, playerName, password, isSpectator }) => {
+        // ✅ Duplicate socket check — pehle
+        if (socket.data.roomId && rooms[socket.data.roomId]) {
+            const oldRoom = rooms[socket.data.roomId];
+            const oldSeat = oldRoom.players.find(p => p.socketId === socket.id);
+            if (oldSeat) {
+                socket.emit("joined", { playerId: oldSeat.id, roomId: socket.data.roomId });
+                return;
+            }
+        }
+
         if (rooms[roomId]) {
             const room = rooms[roomId];
             const anyConnected = room.players.some(p => p.connected);
             if (anyConnected && room.password) {
-                if (!password || password !== room.password) return socket.emit("joinError", "Galat password!");
+                if (!password || password !== room.password) {
+                    return socket.emit("joinError", "Galat password!");
+                }
             }
-        } else rooms[roomId] = createRoom(roomId, password || null);
+        } else {
+            rooms[roomId] = createRoom(roomId, password || null);
+        }
 
         const room = rooms[roomId];
 
+        // SPECTATOR MODE
         if (isSpectator) {
             const specId = room.spectators.length + 1;
-            room.spectators.push({ id: specId, name: playerName || `Spectator ${specId}`, socketId: socket.id });
+            room.spectators.push({
+                id: specId,
+                name: playerName || `Spectator ${specId}`,
+                socketId: socket.id
+            });
+
             socket.join(roomId);
             socket.data.roomId = roomId;
             socket.data.isSpectator = true;
+
             socket.emit("joined", { playerId: -specId, roomId, isSpectator: true });
             socket.emit("spectatorJoined", {
                 room: {
-                    phase: room.phase, teamAScore: room.teamAScore, teamBScore: room.teamBScore,
-                    players: room.players.map(p => ({ id: p.id, name: p.name, team: p.team, handSize: p.hand.length, tricks: p.tricks }))
+                    phase: room.phase,
+                    teamAScore: room.teamAScore,
+                    teamBScore: room.teamBScore,
+                    players: room.players.map(p => ({
+                        id: p.id, name: p.name, team: p.team,
+                        handSize: p.hand.length, tricks: p.tricks
+                    }))
                 }
             });
+
+            console.log(`👀 Spectator joined room ${roomId}`);
             return;
         }
 
-        const existingSeat = room.players.find(p => p.socketId === socket.id);
-        if (existingSeat) {
-            socket.emit("joined", { playerId: existingSeat.id, roomId });
-            return;
-        }
-
+        // NORMAL PLAYER JOIN
         const seat = room.players.find(p => !p.connected);
         if (!seat) return socket.emit("joinError", "Room full — try Spectate mode");
 
         seat.connected = true;
         seat.socketId = socket.id;
 
+        // ✅ STRICT UNIQUE NAME — case-insensitive
         const desiredName = (playerName || 'Player').trim().slice(0, 15) || 'Player';
         let finalName = desiredName;
-        let suffix = 1;
-        while (room.players.some(p => p.id !== seat.id && p.name === finalName)) {
-            suffix++;
+        let suffix = 2;
+
+        while (
+            room.players.some(p =>
+                p.id !== seat.id &&
+                p.name &&
+                p.name.replace(/\s*\(\d+\)$/, '').trim().toLowerCase() === desiredName.toLowerCase()
+            )
+        ) {
             finalName = `${desiredName} (${suffix})`;
+            suffix++;
+            if (suffix > 20) break;
         }
         seat.name = finalName;
+
+        console.log(`✅ P${seat.id} = "${finalName}" (Socket: ${socket.id.slice(0, 6)}...)`);
+        console.log(`   Room ${roomId}:`, room.players.map(p => `P${p.id}:${p.name}${p.connected ? '' : '(off)'}`).join(' | '));
 
         socket.join(roomId);
         socket.data.roomId = roomId;
         socket.data.playerId = seat.id;
 
         socket.emit("joined", { playerId: seat.id, roomId });
+
         io.to(roomId).emit("roomUpdate", {
             players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot }))
         });
@@ -623,8 +691,12 @@ io.on("connection", socket => {
         }
     });
 
+    // START BOT GAME
     socket.on("startBotGame", ({ roomId, playerName }) => {
+        console.log(`🤖 Bot game request: room=${roomId}, name=${playerName}`);
+
         if (rooms[roomId]) delete rooms[roomId];
+
         rooms[roomId] = createRoom(roomId, null);
         const room = rooms[roomId];
         room.isBotGame = true;
@@ -639,28 +711,36 @@ io.on("connection", socket => {
         socket.data.roomId = roomId;
         socket.data.playerId = 1;
 
+        // Force bot names
         room.players[1].connected = true; room.players[1].isBot = true; room.players[1].name = "🤖 Bot 2"; room.players[1].socketId = null;
         room.players[2].connected = true; room.players[2].isBot = true; room.players[2].name = "🤖 Bot 3"; room.players[2].socketId = null;
         room.players[3].connected = true; room.players[3].isBot = true; room.players[3].name = "🤖 Bot 4"; room.players[3].socketId = null;
 
         socket.emit("joined", { playerId: 1, roomId });
+
         io.to(roomId).emit("roomUpdate", {
-            players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot }))
+            players: room.players.map(p => ({
+                id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot
+            }))
         });
 
         dealMainFresh(room);
         sendGameStart(room);
         sendBidUpdate(room);
 
+        console.log(`✅ Bot game started in room ${roomId}`);
+
         setTimeout(() => scheduleBotAction(room), 800);
     });
 
+    // BID
     socket.on("bid", ({ bid }) => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const res = handleBid(room, socket.data.playerId, bid);
         if (res.error) return socket.emit("errorMsg", res.error);
         sendBidUpdate(room);
+
         if (!room.biddingActive) {
             io.to(room.id).emit("biddingFinished", {
                 highestBid: room.highestBid,
@@ -672,16 +752,23 @@ io.on("connection", socket => {
         setTimeout(() => scheduleBotAction(room), 500);
     });
 
+    // PASS
     socket.on("pass", () => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const res = handlePass(room, socket.data.playerId);
         if (res.error) return socket.emit("errorMsg", res.error);
         sendBidUpdate(room);
+
         if (!room.biddingActive) {
             if (room.phase === PHASE_WARMUP && room.warmupAllPassed) {
                 io.to(room.id).emit("warmupSkipped", {});
-                setTimeout(() => { dealMainFromWarmup(room); sendGameStart(room); sendBidUpdate(room); setTimeout(() => scheduleBotAction(room), 800); }, 1500);
+                setTimeout(() => {
+                    dealMainFromWarmup(room);
+                    sendGameStart(room);
+                    sendBidUpdate(room);
+                    setTimeout(() => scheduleBotAction(room), 800);
+                }, 1500);
             } else {
                 io.to(room.id).emit("biddingFinished", {
                     highestBid: room.highestBid,
@@ -694,62 +781,80 @@ io.on("connection", socket => {
         setTimeout(() => scheduleBotAction(room), 500);
     });
 
+    // TRUMP
     socket.on("chooseTrump", ({ suit }) => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const res = handleTrump(room, socket.data.playerId, suit);
         if (res.error) return socket.emit("errorMsg", res.error);
+
         io.to(room.id).emit("trumpSet", {
-            trumpSuit: suit, waitReveal: !!res.waitReveal,
+            trumpSuit: suit,
+            waitReveal: !!res.waitReveal,
             highestBidderId: room.players[room.highestBidder].id,
             highestBidderName: room.players[room.highestBidder].name
         });
-        if (!res.waitReveal) { broadcastRoundStart(room); setTimeout(() => scheduleBotAction(room), 800); }
+
+        if (!res.waitReveal) {
+            broadcastRoundStart(room);
+            setTimeout(() => scheduleBotAction(room), 800);
+        }
     });
 
+    // REVEAL
     socket.on("revealDecision", ({ decision }) => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const res = handleRevealDecision(room, socket.data.playerId, decision);
         if (res.error) return socket.emit("errorMsg", res.error);
+
         io.to(room.id).emit("teammateRevealed", { revealed: room.teammateRevealed });
         broadcastRoundStart(room);
         setTimeout(() => scheduleBotAction(room), 800);
     });
 
+    // TOGGLE REVEAL
     socket.on("toggleReveal", () => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const pid = socket.data.playerId;
         if (room.highestBidder === null || room.highestBidder === undefined) return;
         if (room.highestBidder !== pid - 1) return;
+
         room.teammateRevealed = !room.teammateRevealed;
         room.revealDecision = room.teammateRevealed ? "show" : "hide";
+
         io.to(room.id).emit("teammateRevealed", { revealed: room.teammateRevealed });
         if (room.teammateRevealed) broadcastRevealedHandUpdate(room);
     });
 
+    // PLAY CARD
     socket.on("playCard", ({ cardIndex }) => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const pid = socket.data.playerId;
         const res = handlePlayCard(room, pid, cardIndex);
         if (res.error) return socket.emit("errorMsg", res.error);
+
         const pidPlayer = room.players[pid - 1];
         if (pidPlayer && pidPlayer.socketId) {
             io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
         }
+
         if (room.teammateRevealed && room.highestBidder !== null && room.players[room.highestBidder]) {
             const mateId = TEAMMATES[room.players[room.highestBidder].id];
             if (mateId && pid === mateId) broadcastRevealedHandUpdate(room);
         }
+
         io.to(room.id).emit("cardPlayed", {
-            playerId: pid, playerName: room.players[pid - 1].name,
+            playerId: pid,
+            playerName: room.players[pid - 1].name,
             card: room.trickCards[room.trickCards.length - 1].card,
             trickCards: room.trickCards,
             nextPlayerId: room.trickCards.length < 4 ? room.players[room.currentPlayerIndex].id : null,
             leadPlayerId: room.trickCards[0].playerIndex + 1
         });
+
         if (res.resolveTrick) {
             setTimeout(() => {
                 const r = resolveTrick(room);
@@ -762,10 +867,12 @@ io.on("connection", socket => {
                     bidBroken: !!r.bidBroken,
                     players: room.players.map(p => ({ id: p.id, tricks: p.tricks, handSize: p.hand.length }))
                 });
+
                 room.players.forEach(p => {
                     if (p.isBot || !p.socketId || !p.connected) return;
                     io.to(p.socketId).emit("handUpdate", { hand: p.hand });
                 });
+
                 if (r.roundEnd) {
                     if (room.phase === PHASE_WARMUP) {
                         const result = finishWarmup(room);
@@ -773,70 +880,129 @@ io.on("connection", socket => {
                         if (room.teamAScore >= WIN_SCORE || room.teamBScore >= WIN_SCORE) {
                             const winner = room.teamAScore >= WIN_SCORE ? "A" : "B";
                             room.gameEnded = winner;
-                            io.to(room.id).emit("gameOver", { winner, teamAScore: room.teamAScore, teamBScore: room.teamBScore });
-                        } else setTimeout(() => { dealWarmup(room); sendGameStart(room); sendBidUpdate(room); setTimeout(() => scheduleBotAction(room), 800); }, 5000);
+                            io.to(room.id).emit("gameOver", {
+                                winner, teamAScore: room.teamAScore, teamBScore: room.teamBScore
+                            });
+                        } else {
+                            setTimeout(() => {
+                                dealWarmup(room);
+                                sendGameStart(room);
+                                sendBidUpdate(room);
+                                setTimeout(() => scheduleBotAction(room), 800);
+                            }, 5000);
+                        }
                     } else {
                         const result = finishMain(room);
                         io.to(room.id).emit("roundEnd", result);
-                        if (room.gameEnded) io.to(room.id).emit("gameOver", { winner: room.gameEnded, teamAScore: room.teamAScore, teamBScore: room.teamBScore });
-                        else setTimeout(() => { dealWarmup(room); sendGameStart(room); sendBidUpdate(room); setTimeout(() => scheduleBotAction(room), 800); }, 4000);
+                        if (room.gameEnded) {
+                            io.to(room.id).emit("gameOver", {
+                                winner: room.gameEnded, teamAScore: room.teamAScore, teamBScore: room.teamBScore
+                            });
+                        } else {
+                            setTimeout(() => {
+                                dealWarmup(room);
+                                sendGameStart(room);
+                                sendBidUpdate(room);
+                                setTimeout(() => scheduleBotAction(room), 800);
+                            }, 4000);
+                        }
                     }
-                } else setTimeout(() => scheduleBotAction(room), 600);
+                } else {
+                    setTimeout(() => scheduleBotAction(room), 600);
+                }
             }, 1200);
-        } else setTimeout(() => scheduleBotAction(room), 600);
+        } else {
+            setTimeout(() => scheduleBotAction(room), 600);
+        }
     });
 
+    // VOTE RESET
     socket.on("voteRestart", () => {
         const room = rooms[socket.data.roomId];
         if (!room) return;
         const pid = socket.data.playerId;
+
         if (room.restartVotes.has(pid)) room.restartVotes.delete(pid);
         else room.restartVotes.add(pid);
-        io.to(room.id).emit("restartVotesUpdate", { votes: Array.from(room.restartVotes), total: room.restartVotes.size });
+
+        io.to(room.id).emit("restartVotesUpdate", {
+            votes: Array.from(room.restartVotes),
+            total: room.restartVotes.size
+        });
+
         if (room.restartVotes.size >= 3) {
-            room.teamAScore = 0; room.teamBScore = 0; room.gameEnded = false;
+            room.teamAScore = 0;
+            room.teamBScore = 0;
+            room.gameEnded = false;
             room.restartVotes.clear();
+
             dealWarmup(room);
             io.to(room.id).emit("gameRestarted", {});
-            sendGameStart(room); sendBidUpdate(room);
+            sendGameStart(room);
+            sendBidUpdate(room);
             setTimeout(() => scheduleBotAction(room), 800);
         }
     });
 
+    // LEAVE ROOM
     socket.on("leaveRoom", () => {
         const roomId = socket.data.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
+
         if (socket.data.isSpectator) {
             room.spectators = room.spectators.filter(s => s.socketId !== socket.id);
-            socket.leave(roomId); socket.data.roomId = null; socket.data.isSpectator = false;
+            socket.leave(roomId);
+            socket.data.roomId = null;
+            socket.data.isSpectator = false;
             return;
         }
+
         const player = room.players.find(p => p.socketId === socket.id);
         if (player) {
-            player.connected = false; player.socketId = null; player.hand = []; player.tricks = 0;
+            player.connected = false;
+            player.socketId = null;
+            player.hand = [];
+            player.tricks = 0;
             room.restartVotes.delete(player.id);
-            io.to(roomId).emit("roomUpdate", { players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot })) });
+
+            io.to(roomId).emit("roomUpdate", {
+                players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot }))
+            });
             io.to(roomId).emit("playerLeft", { playerId: player.id, playerName: player.name });
         }
-        socket.leave(roomId); socket.data.roomId = null; socket.data.playerId = null;
+
+        socket.leave(roomId);
+        socket.data.roomId = null;
+        socket.data.playerId = null;
+
         const anyConnected = room.players.some(p => p.connected && !p.isBot);
-        if (!anyConnected && room.spectators.length === 0) delete rooms[roomId];
+        if (!anyConnected && room.spectators.length === 0) {
+            delete rooms[roomId];
+            console.log(`🗑️ Room ${roomId} deleted`);
+        }
     });
 
+    // DISCONNECT
     socket.on("disconnect", () => {
         const roomId = socket.data.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
+
         if (socket.data.isSpectator) {
             room.spectators = room.spectators.filter(s => s.socketId !== socket.id);
             return;
         }
+
         const player = room.players.find(p => p.socketId === socket.id);
         if (player) {
-            player.connected = false; player.socketId = null;
+            player.connected = false;
+            player.socketId = null;
             room.restartVotes.delete(player.id);
-            io.to(roomId).emit("roomUpdate", { players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot })) });
+            console.log(`❌ P${player.id} (${player.name}) disconnected`);
+            io.to(roomId).emit("roomUpdate", {
+                players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot }))
+            });
         }
     });
 });
