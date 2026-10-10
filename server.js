@@ -1,5 +1,5 @@
-const: express = require("express");
-const http null = require("http");
+const express = require("express");
+const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
 
@@ -89,7 +89,7 @@ function createRoom(roomId, password) {
         players: [
             { id: 1, name: "Player 1", team: "A", hand: [], tricks: 0, socketId: null, connected: false, isBot: false },
             { id: 2, name: "Player 2", team: "A", hand: [], tricks: 0, socketId: null, connected: false, isBot: false },
-            { id: 3, name: "Player 3", team: "B", hand: [], tricks: , connected: false, isBot: false },
+            { id: 3, name: "Player 3", team: "B", hand: [], tricks: 0, socketId: null, connected: false, isBot: false },
             { id: 4, name: "Player 4", team: "B", hand: [], tricks: 0, socketId: null, connected: false, isBot: false }
         ],
         currentBid: MAIN_START_BID, highestBid: MAIN_START_BID, highestBidder: null,
