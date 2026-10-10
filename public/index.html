@@ -3,47 +3,72 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>29 Card Game</title>
+<title>Desi Call Break</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ============ LOBBY ============ -->
+<!-- ============ PREMIUM LOBBY ============ -->
 <div id="lobby">
     <div class="lobby-content">
+
         <div class="game-logo">
+            <div class="logo-crown">👑</div>
             <span class="logo-icon-big">🃏</span>
-            <h1 class="game-title">29</h1>
-            <p class="game-subtitle">Card Game • 4 Players</p>
+            <h1 class="game-title">DESI CALL BREAK</h1>
+            <p class="game-subtitle">PREMIUM CARD GAME</p>
         </div>
 
-        <div class="input-group">
-            <label class="input-label">Your Name</label>
-            <input id="input-name" type="text" placeholder="Enter your name" maxlength="15">
+        <div class="glass-card join-card">
+            <div class="card-header">
+                <span class="ch-icon">🚪</span>
+                <span class="ch-title">Join a Room</span>
+            </div>
+
+            <div class="input-group icon-input">
+                <span class="input-icon">👤</span>
+                <input id="input-name" type="text" placeholder="Your name" maxlength="15">
+            </div>
+
+            <div class="input-group icon-input">
+                <span class="input-icon">🔢</span>
+                <input id="input-room" type="text" placeholder="Room ID" maxlength="10">
+            </div>
+
+            <div class="input-group icon-input">
+                <span class="input-icon">🔒</span>
+                <input id="input-pass" type="text" placeholder="Password (optional)">
+            </div>
+
+            <button id="btn-join" class="primary-btn">
+                <span class="btn-icon">▶</span>
+                <span>JOIN ROOM</span>
+            </button>
         </div>
 
-        <div class="input-group">
-            <label class="input-label">Room ID</label>
-            <input id="input-room" type="text" placeholder="e.g. 1234" maxlength="10">
-        </div>
+        <div class="divider"><span>OR</span></div>
 
-        <div class="input-group">
-            <label class="input-label">Password (optional)</label>
-            <input id="input-pass" type="text" placeholder="Leave empty for no password">
+        <div class="mode-cards">
+            <button id="btn-bot" class="mode-card-premium">
+                <div class="mc-icon">🤖</div>
+                <div class="mc-title">Play vs Bots</div>
+                <div class="mc-sub">Instant Game</div>
+            </button>
+            <button id="btn-spectate" class="mode-card-premium">
+                <div class="mc-icon">👁️</div>
+                <div class="mc-title">Spectate</div>
+                <div class="mc-sub">Watch Live</div>
+            </button>
         </div>
-
-        <button id="btn-join" class="primary-btn">🚪 Join Room</button>
-        <button id="btn-bot" class="secondary-btn">🤖 Play vs Bots</button>
-        <button id="btn-spectate" class="secondary-btn">👁️ Spectate Match</button>
 
         <p id="lobby-msg"></p>
+        <p class="lobby-footer">◆ v1.0 ◆ DESI CALL BREAK ◆</p>
     </div>
 </div>
 
-<!-- ============ GAME ============ -->
+<!-- ============ GAME SCREEN ============ -->
 <div id="game" class="hidden">
 
-    <!-- TOP BAR -->
     <div id="top-bar">
         <div class="round-badge">
             <span class="rb-icon">📋</span>
@@ -73,9 +98,7 @@
         </div>
     </div>
 
-    <!-- TABLE -->
     <div id="table">
-        <!-- Top = Player 2 (teammate) -->
         <div class="seat seat-top" id="seat-2">
             <div class="player-badge"><span class="pb-name">Player 2</span><span class="pb-suit">♠️</span></div>
             <div class="avatar-wrap">
@@ -85,7 +108,6 @@
             </div>
         </div>
 
-        <!-- Left = Player 3 -->
         <div class="seat seat-left" id="seat-3">
             <div class="player-badge"><span class="pb-name">Player 3</span><span class="pb-suit">♠️</span></div>
             <div class="avatar-wrap">
@@ -95,7 +117,6 @@
             </div>
         </div>
 
-        <!-- Right = Player 4 -->
         <div class="seat seat-right" id="seat-4">
             <div class="player-badge"><span class="pb-name">Player 4</span><span class="pb-suit">♠️</span></div>
             <div class="avatar-wrap">
@@ -105,7 +126,6 @@
             </div>
         </div>
 
-        <!-- Center played cards -->
         <div id="played-cards-center">
             <div class="pc-slot pc-top" id="pc-2"></div>
             <div class="pc-slot pc-left" id="pc-3"></div>
@@ -114,9 +134,7 @@
         </div>
     </div>
 
-    <!-- MY AREA -->
     <div id="my-area">
-        <!-- Revealed partner hand -->
         <div id="teammate-cards" class="hidden">
             <div class="tc-header">
                 <h4 id="partner-title">👀 Partner's Hand</h4>
@@ -138,13 +156,11 @@
         <div id="player1-cards"></div>
     </div>
 
-    <!-- Bid UI -->
     <div id="bid-ui">
         <div id="bid-turn-info">Your turn to bid</div>
         <div id="main-bid-buttons"></div>
     </div>
 
-    <!-- Spectator banner -->
     <div id="spectator-banner" class="hidden">👁️ SPECTATING</div>
 </div>
 
@@ -164,7 +180,7 @@
 <div id="reveal-modal" class="modal-overlay hidden">
     <div class="modal-box">
         <h3>Show Partner's Cards?</h3>
-        <p>Bid was 9+. Do you want to reveal your teammate's hand to everyone?</p>
+        <p>Bid was 9+. Do you want to reveal your teammate's hand?</p>
         <div class="modal-buttons">
             <button id="reveal-yes" class="primary-btn">👀 Show</button>
             <button id="reveal-no" class="danger-btn">🙈 Hide</button>
@@ -191,7 +207,6 @@
     </div>
 </div>
 
-<!-- HISTORY -->
 <div id="history-panel" class="hidden">
     <div class="drag-bar"></div>
     <div id="history-header">
@@ -211,6 +226,6 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="client.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
