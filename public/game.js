@@ -15,7 +15,6 @@ const S = {
 
 const $ = id => document.getElementById(id);
 
-/* Position mapping — har viewer ke perspective se */
 const SEAT_MAP = {
     1: { top: 2, left: 3, right: 4 },
     2: { top: 1, left: 4, right: 3 },
@@ -101,6 +100,12 @@ socket.on('gameStart', data => {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active', 'bid-winner', 'leader'));
     renderGame();
     renderAllSeats();
+    
+    // ✅ Initial bid glow
+    if (data.currentBidderId && data.currentBidderId !== S.myId) {
+        renderBidTurnGlow(data.currentBidderId);
+    }
+    
     if (data.currentBidderId === S.myId) renderBidUI();
 });
 
@@ -112,6 +117,14 @@ socket.on('bidUpdate', data => {
     parseBidHistory(S.bidHistory);
     renderBidHistory();
     renderBidBadges();
+
+    // ✅ BID TURN RED GLOW
+    if (data.biddingActive && data.nextBidderId) {
+        renderBidTurnGlow(data.nextBidderId);
+    } else {
+        document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
+    }
+
     if (data.biddingActive && data.nextBidderId === S.myId && !S.isSpectator) renderBidUI();
     else $('bid-ui').classList.remove('active');
 });
@@ -120,6 +133,7 @@ socket.on('biddingFinished', data => {
     S.highestBid = data.highestBid; S.highestBidderId = data.highestBidderId;
     S.biddingActive = false;
     $('bid-ui').classList.remove('active');
+    document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     renderCrown();
     if (data.highestBidderId === S.myId && !S.isSpectator) $('trump-modal').classList.remove('hidden');
 });
@@ -227,7 +241,7 @@ socket.on('spectatorJoined', data => {
     renderGame();
 });
 
-/* Position-based helpers */
+/* Position helpers */
 function findPcSlotForPlayer(pid) {
     if (pid === S.myId) return 'pc-bottom';
     for (const slot in S.pcMap) {
@@ -302,6 +316,17 @@ function renderTurnIndicator() {
     highlightPlayable();
 }
 
+function renderBidTurnGlow(bidderId) {
+    document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
+    if (bidderId && bidderId !== S.myId) {
+        const seatId = findSeatForPlayer(bidderId);
+        if (seatId) {
+            const seat = $(seatId);
+            if (seat) seat.classList.add('active');
+        }
+    }
+}
+
 function renderLeaderStar() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('leader'));
     if (S.leadPlayerId !== null && S.leadPlayerId !== S.myId) {
@@ -328,7 +353,7 @@ function updateTrumpIndicator() {
 }
 
 function renderBidUI() {
-    const container = $('main-bid-buttons'); container.innerHTML = '';
+    const container = $(''); container.innerHTML = '';
     if (S.phase === 'warmup') {
         const bidBtn = document.createElement('button');
         bidBtn.textContent = 'Bid 5';
