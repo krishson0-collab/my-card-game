@@ -1,6 +1,4 @@
-/* =========================================================
-   Desi Call Break — Client
-   ========================================================= */
+/* Desi Call Break — Client */
 const socket = io();
 
 const S = {
@@ -10,7 +8,8 @@ const S = {
     biddingActive: false, nextBidderId: null,
     handSizes: {}, tricks: {}, revealedHand: null, revealedOwnerId: null,
     bidWinnerId: null, teamAScore: 0, teamBScore: 0, totalTricks: 5,
-    playerNames: {}, playerTeams: {}, bidHistory: [], playerBids: {}
+    playerNames: {}, playerTeams: {}, bidHistory: [], playerBids: {},
+    isPlayingCard: false, cardJustPlayed: false, lastResolvedTrick: -1
 };
 
 const $ = id => document.getElementById(id);
@@ -57,15 +56,26 @@ socket.on('joined', data => {
 socket.on('joinError', msg => showLobbyMsg(msg));
 
 socket.on('roomUpdate', data => {
+    const nameCount = {};
+    data.players.forEach(p => { if (p.connected) nameCount[p.name] = (nameCount[p.name] || 0) + 1; });
+
     data.players.forEach(p => {
         S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
         const seat = $('seat-' + p.id);
         if (seat) {
             const nameEl = seat.querySelector('.pb-name');
-            if (nameEl) nameEl.textContent = p.name;
+            if (nameEl) {
+                let displayName = p.name;
+                if (nameCount[p.name] > 1) displayName = `${p.name} (P${p.id})`;
+                nameEl.textContent = displayName;
+            }
         }
     });
-    if (S.myId && S.playerNames[S.myId]) $('my-name').textContent = S.playerNames[S.myId];
+    if (S.myId && S.playerNames[S.myId]) {
+        let myDisplay = S.playerNames[S.myId];
+        if (nameCount[myDisplay] > 1) myDisplay = `${myDisplay} (You)`;
+        $('my-name').textContent = myDisplay;
+    }
 });
 
 socket.on('gameStart', data => {
@@ -76,6 +86,7 @@ socket.on('gameStart', data => {
     S.revealedHand = null; S.revealedOwnerId = null;
     S.bidWinnerId = null; S.trumpSuit = null;
     S.playerBids = {}; S.leadPlayerId = null;
+    S.isPlayingCard = false; S.cardJustPlayed = false; S.lastResolvedTrick = -1;
     data.players.forEach(p => {
         S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
         S.handSizes[p.id] = p.handSize; S.tricks[p.id] = p.tricks;
@@ -132,6 +143,8 @@ socket.on('roundStarted', data => {
     S.bidWinnerId = data.bidWinnerId;
     S.phase = data.phase;
     S.totalTricks = data.totalTricks;
+    S.isPlayingCard = false; S.cardJustPlayed = false; S.lastResolvedTrick = -1;
+    document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
     data.handSizes.forEach(h => { S.handSizes[h.id] = h.size; S.tricks[h.id] = h.tricks; });
     if (S.revealedHand && S.revealedHand.length > 0) {
         $('teammate-cards').classList.remove('hidden');
@@ -147,6 +160,7 @@ socket.on('roundStarted', data => {
 socket.on('cardPlayed', data => {
     const slot = $('pc-' + data.playerId);
     if (slot) { slot.innerHTML = ''; slot.appendChild(makeCardEl(data.card)); }
+    if (data.playerId === S.myId) S.isPlayingCard = false;
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
     renderTurnIndicator();
@@ -163,8 +177,18 @@ socket.on('handUpdate', data => {
 socket.on('trickResolved', data => {
     data.players.forEach(p => { S.tricks[p.id] = p.tricks; S.handSizes[p.id] = p.handSize; });
     renderScores();
+    S.cardJustPlayed = false;
+    S.isPlayingCard = false;
     if (data.bidBroken) showToast('💥 Bid Broken!', 1500);
-    setTimeout(() => { document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = ''); }, 800);
+
+    const thisTrick = data.trickNumber;
+    S.lastResolvedTrick = thisTrick;
+    setTimeout(() => {
+        if (S.lastResolvedTrick === thisTrick && S.currentPlayerId === data.nextPlayerId) {
+            document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
+        }
+    }, 800);
+
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
     renderTurnIndicator();
@@ -188,7 +212,7 @@ socket.on('gameRestarted', () => {
 });
 socket.on('restartVotesUpdate', data => { $('vote-badge').textContent = data.total; });
 socket.on('errorMsg', msg => console.warn('Server error:', msg));
-socket.on('playerLeft', data => console.log(data.playerName + ' left the room'));
+socket.on('playerLeft', data => console.log(data.playerName + ' left'));
 socket.on('spectatorJoined', data => {
     if (!data.room) return;
     S.teamAScore = data.room.teamAScore; S.teamBScore = data.room.teamBScore; S.phase = data.room.phase;
@@ -373,7 +397,12 @@ function renderTeammateHand() {
 /* ACTIONS */
 function onPlayCard(idx) {
     if (S.currentPlayerId !== S.myId) return;
+    if (S.isPlayingCard) return;
+    if (S.cardJustPlayed) return;
+    S.isPlayingCard = true;
+    S.cardJustPlayed = true;
     socket.emit('playCard', { cardIndex: idx });
+    setTimeout(() => { S.isPlayingCard = false; }, 1000);
 }
 
 $('trump-buttons').addEventListener('click', e => {
@@ -404,6 +433,16 @@ $('btn-toggle-reveal').addEventListener('click', () => {
 $('btn-vote-reset').addEventListener('click', () => socket.emit('voteRestart'));
 $('btn-history').addEventListener('click', () => $('history-panel').classList.remove('hidden'));
 $('btn-close-history').addEventListener('click', () => $('history-panel').classList.add('hidden'));
+
+$('btn-clear-history').addEventListener('click', () => {
+    if (confirm('Clear all history?')) {
+        S.bidHistory = []; S.playerBids = {};
+        renderBidHistory(); renderBidBadges();
+        const rl = $('round-history-list');
+        if (rl) rl.innerHTML = '<div class="bid-empty">No rounds yet</div>';
+    }
+});
+
 $('btn-leave').addEventListener('click', () => {
     if (confirm('Leave the game?')) { socket.emit('leaveRoom'); setTimeout(() => location.reload(), 300); }
 });
@@ -468,7 +507,7 @@ function showToast(msg, duration = 2000) {
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'toast-msg';
-        toast.style.cssText = `position:fixed;top:30%;left:50%;transform:translate(-50%,-50%);background:rgba(60,20,30,0.95);color:#fff;padding:14px 28px;border-radius:16px;font-size:16px;font-weight:900;z-index:3000;border:3px solid #d4a850;box-shadow:0 10px 30px rgba(0,0,0,0.4);pointer-events:none;white-space:nowrap;`;
+        toast.style.cssText = `position:fixed;top:30%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);color:#fff;padding:14px 28px;border-radius:16px;font-size:16px;font-weight:900;z-index:3000;border:2px solid #ffd966;box-shadow:0 10px 30px rgba(0,0,0,0.6);pointer-events:none;white-space:nowrap;`;
         document.body.appendChild(toast);
     }
     toast.textContent = msg;

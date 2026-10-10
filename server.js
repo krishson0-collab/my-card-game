@@ -209,6 +209,8 @@ function handlePlayCard(room, playerId, cardIndex) {
     if (!room.roundStarted) return { error: "Round not started" };
     const idx = playerId - 1;
     if (room.currentPlayerIndex !== idx) return { error: "Not your turn" };
+    // ✅ Duplicate check
+    if (room.trickCards.some(tc => tc.playerIndex === idx)) return { error: "Already played this trick" };
     const player = room.players[idx];
     const card = player.hand[cardIndex];
     if (!card) return { error: "Invalid card" };
@@ -323,7 +325,7 @@ function sendGameStart(room) {
         try {
             io.to(p.socketId).emit("gameStart", {
                 yourId: p.id, yourHand: p.hand, phase: room.phase,
-                players: room.players.map(pl => ({ id: pl.id, name: pl.name, team: pl.team, handSize: pl.hand.length, tricks: pl.tricks })),
+                players: room.players.map(pl => ({ id: pl.id, name: pl.name, team: pl.team, handSize: pl.hand.length, tricks: pl.tricks, isBot: pl.isBot })),
                 currentBid: room.currentBid,
                 currentBidderId: room.players[getCurrentBidderIndex(room)].id,
                 bidHistory: room.bidHistory,
@@ -515,6 +517,11 @@ function botPlay(room, bot) {
                 bidBroken: !!r.bidBroken,
                 players: room.players.map(p => ({ id: p.id, tricks: p.tricks, handSize: p.hand.length }))
             });
+            // ✅ Hand updates
+            room.players.forEach(p => {
+                if (p.isBot || !p.socketId || !p.connected) return;
+                io.to(p.socketId).emit("handUpdate", { hand: p.hand });
+            });
             if (r.roundEnd) {
                 if (room.phase === PHASE_WARMUP) {
                     const result = finishWarmup(room);
@@ -565,16 +572,24 @@ io.on("connection", socket => {
             return;
         }
 
+        // ✅ Double socket check
+        const existingSeat = room.players.find(p => p.socketId === socket.id);
+        if (existingSeat) {
+            socket.emit("joined", { playerId: existingSeat.id, roomId });
+            return;
+        }
+
         const seat = room.players.find(p => !p.connected);
         if (!seat) return socket.emit("joinError", "Room full — try Spectate mode");
 
         seat.connected = true;
         seat.socketId = socket.id;
 
+        // ✅ Unique name
         const desiredName = (playerName || 'Player').trim().slice(0, 15) || 'Player';
         let finalName = desiredName;
         let suffix = 1;
-        while (room.players.some(p => p.id !== seat.id && p.connected && p.name === finalName)) {
+        while (room.players.some(p => p.id !== seat.id && p.name === finalName)) {
             suffix++;
             finalName = `${desiredName} (${suffix})`;
         }
@@ -586,7 +601,7 @@ io.on("connection", socket => {
 
         socket.emit("joined", { playerId: seat.id, roomId });
         io.to(roomId).emit("roomUpdate", {
-            players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team }))
+            players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot }))
         });
 
         const allConnected = room.players.every(p => p.connected);
@@ -613,9 +628,10 @@ io.on("connection", socket => {
         socket.data.roomId = roomId;
         socket.data.playerId = 1;
 
-        room.players.forEach((p, idx) => {
-            if (idx > 0) { p.connected = true; p.isBot = true; p.name = `🤖 Bot ${p.id}`; p.socketId = null; }
-        });
+        // ✅ Force bot names
+        room.players[1].connected = true; room.players[1].isBot = true; room.players[1].name = "🤖 Bot 2"; room.players[1].socketId = null;
+        room.players[2].connected = true; room.players[2].isBot = true; room.players[2].name = "🤖 Bot 3"; room.players[2].socketId = null;
+        room.players[3].connected = true; room.players[3].isBot = true; room.players[3].name = "🤖 Bot 4"; room.players[3].socketId = null;
 
         socket.emit("joined", { playerId: 1, roomId });
         io.to(roomId).emit("roomUpdate", {
@@ -710,7 +726,9 @@ io.on("connection", socket => {
         const res = handlePlayCard(room, pid, cardIndex);
         if (res.error) return socket.emit("errorMsg", res.error);
         const pidPlayer = room.players[pid - 1];
-        if (pidPlayer && pidPlayer.socketId) io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
+        if (pidPlayer && pidPlayer.socketId) {
+            io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
+        }
         if (room.teammateRevealed && room.highestBidder !== null && room.players[room.highestBidder]) {
             const mateId = TEAMMATES[room.players[room.highestBidder].id];
             if (mateId && pid === mateId) broadcastRevealedHandUpdate(room);
@@ -733,6 +751,10 @@ io.on("connection", socket => {
                     warmupFailed: !!r.warmupFailed,
                     bidBroken: !!r.bidBroken,
                     players: room.players.map(p => ({ id: p.id, tricks: p.tricks, handSize: p.hand.length }))
+                });
+                room.players.forEach(p => {
+                    if (p.isBot || !p.socketId || !p.connected) return;
+                    io.to(p.socketId).emit("handUpdate", { hand: p.hand });
                 });
                 if (r.roundEnd) {
                     if (room.phase === PHASE_WARMUP) {
@@ -784,7 +806,7 @@ io.on("connection", socket => {
         if (player) {
             player.connected = false; player.socketId = null; player.hand = []; player.tricks = 0;
             room.restartVotes.delete(player.id);
-            io.to(roomId).emit("roomUpdate", { players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team })) });
+            io.to(roomId).emit("roomUpdate", { players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot })) });
             io.to(roomId).emit("playerLeft", { playerId: player.id, playerName: player.name });
         }
         socket.leave(roomId); socket.data.roomId = null; socket.data.playerId = null;
@@ -804,7 +826,7 @@ io.on("connection", socket => {
         if (player) {
             player.connected = false; player.socketId = null;
             room.restartVotes.delete(player.id);
-            io.to(roomId).emit("roomUpdate", { players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team })) });
+            io.to(roomId).emit("roomUpdate", { players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot })) });
         }
     });
 });
