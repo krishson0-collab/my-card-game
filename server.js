@@ -13,7 +13,11 @@ const SUITS = ["♠️", "♥️", "♦️", "♣️"];
 const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
 const RANK_VALUE = { "2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"10":10,"J":11,"Q":12,"K":13,"A":14 };
 
+// ✅ Turn order: P1 → P4 → P2 → P3 (right-hand)
 const RIGHT_HAND_ORDER = [0, 3, 1, 2];
+// ✅ Deal order: same right-hand
+const RIGHT_HAND_DEAL_ORDER = [0, 3, 1, 2];
+
 const TEAMMATES = { 1: 2, 2: 1, 3: 4, 4: 3 };
 const TEAMS = { A: [1, 2], B: [3, 4] };
 
@@ -59,6 +63,17 @@ function sortHand(hand) {
     });
 }
 
+// ✅ RIGHT-HAND DEAL helper — ek-ek card har player ko
+function dealRoundRobin(room, deck, cardsPerPlayer) {
+    let idx = 0;
+    for (let c = 0; c < cardsPerPlayer; c++) {
+        for (let i = 0; i < 4; i++) {
+            const p = RIGHT_HAND_DEAL_ORDER[i];
+            room.players[p].hand.push(deck[idx++]);
+        }
+    }
+}
+
 const rooms = {};
 
 function createRoom(roomId, password) {
@@ -79,33 +94,33 @@ function createRoom(roomId, password) {
     };
 }
 
+// ✅ Warmup deal — RIGHT HAND order
 function dealWarmup(room) {
     const deck = shuffle(createDeck());
     room.phase = PHASE_WARMUP;
     room.players.forEach(p => { p.hand = []; p.tricks = 0; });
-    let idx = 0;
-    for (let c = 0; c < WARMUP_CARDS; c++) for (let p = 0; p < 4; p++) room.players[p].hand.push(deck[idx++]);
+    dealRoundRobin(room, deck, WARMUP_CARDS);
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     resetRoundState(room, WARMUP_BID - 1);
 }
 
+// ✅ Main from warmup — RIGHT HAND order
 function dealMainFromWarmup(room) {
     const usedCards = new Set();
     room.players.forEach(p => p.hand.forEach(c => usedCards.add(c.rank + c.suit)));
     const availableDeck = shuffle(createDeck()).filter(c => !usedCards.has(c.rank + c.suit));
-    let idx = 0;
-    for (let c = 0; c < 8; c++) for (let p = 0; p < 4; p++) room.players[p].hand.push(availableDeck[idx++]);
+    dealRoundRobin(room, availableDeck, 8);
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     room.phase = PHASE_MAIN;
     resetRoundState(room, MAIN_START_BID);
 }
 
+// ✅ Fresh main deal — RIGHT HAND order
 function dealMainFresh(room) {
     const deck = shuffle(createDeck());
     room.phase = PHASE_MAIN;
     room.players.forEach(p => { p.hand = []; p.tricks = 0; });
-    let idx = 0;
-    for (let c = 0; c < 13; c++) for (let p = 0; p < 4; p++) room.players[p].hand.push(deck[idx++]);
+    dealRoundRobin(room, deck, 13);
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     resetRoundState(room, MAIN_START_BID);
 }
@@ -209,7 +224,6 @@ function handlePlayCard(room, playerId, cardIndex) {
     if (!room.roundStarted) return { error: "Round not started" };
     const idx = playerId - 1;
     if (room.currentPlayerIndex !== idx) return { error: "Not your turn" };
-    // ✅ Duplicate check
     if (room.trickCards.some(tc => tc.playerIndex === idx)) return { error: "Already played this trick" };
     const player = room.players[idx];
     const card = player.hand[cardIndex];
@@ -517,7 +531,6 @@ function botPlay(room, bot) {
                 bidBroken: !!r.bidBroken,
                 players: room.players.map(p => ({ id: p.id, tricks: p.tricks, handSize: p.hand.length }))
             });
-            // ✅ Hand updates
             room.players.forEach(p => {
                 if (p.isBot || !p.socketId || !p.connected) return;
                 io.to(p.socketId).emit("handUpdate", { hand: p.hand });
@@ -572,7 +585,6 @@ io.on("connection", socket => {
             return;
         }
 
-        // ✅ Double socket check
         const existingSeat = room.players.find(p => p.socketId === socket.id);
         if (existingSeat) {
             socket.emit("joined", { playerId: existingSeat.id, roomId });
@@ -585,7 +597,6 @@ io.on("connection", socket => {
         seat.connected = true;
         seat.socketId = socket.id;
 
-        // ✅ Unique name
         const desiredName = (playerName || 'Player').trim().slice(0, 15) || 'Player';
         let finalName = desiredName;
         let suffix = 1;
@@ -628,7 +639,6 @@ io.on("connection", socket => {
         socket.data.roomId = roomId;
         socket.data.playerId = 1;
 
-        // ✅ Force bot names
         room.players[1].connected = true; room.players[1].isBot = true; room.players[1].name = "🤖 Bot 2"; room.players[1].socketId = null;
         room.players[2].connected = true; room.players[2].isBot = true; room.players[2].name = "🤖 Bot 3"; room.players[2].socketId = null;
         room.players[3].connected = true; room.players[3].isBot = true; room.players[3].name = "🤖 Bot 4"; room.players[3].socketId = null;
