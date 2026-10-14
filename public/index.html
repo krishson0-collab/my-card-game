@@ -107,6 +107,14 @@
                 <div class="score-badge">0/5</div>
             </div>
         </div>
+        <div class="seat seat-bottom hidden" id="seat-bottom">
+            <div class="player-badge"><span class="pb-name">Waiting...</span><span class="pb-suit">♠️</span></div>
+            <div class="avatar-wrap">
+                <div class="player-avatar">🤖</div>
+                <div class="avatar-fan"><div class="fan-card"></div><div class="fan-card"></div><div class="fan-card"></div></div>
+                <div class="score-badge">0/5</div>
+            </div>
+        </div>
         <div id="played-cards-center">
             <div class="pc-slot pc-top" id="pc-top"></div>
             <div class="pc-slot pc-left" id="pc-left"></div>
@@ -206,11 +214,8 @@
     </div>
 </div>
 
-<audio id="throw-sound" preload="auto">
-    <source src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" type="audio/ogg">
-</audio>
-
 <script src="/socket.io/socket.io.js"></script>
+<script src="sound.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

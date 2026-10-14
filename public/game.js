@@ -23,18 +23,26 @@ const SEAT_MAP = {
 };
 
 function buildMaps() {
+    if (S.isSpectator) {
+        S.seatMap = { 'seat-top': 2, 'seat-left': 3, 'seat-right': 4, 'seat-bottom': 1 };
+        S.pcMap = { 'pc-top': 2, 'pc-left': 3, 'pc-right': 4, 'pc-bottom': 1 };
+        const bs = $('seat-bottom'); if (bs) bs.classList.remove('hidden');
+        return;
+    }
     const m = SEAT_MAP[S.myId] || SEAT_MAP[1];
     S.seatMap = { 'seat-top': m.top, 'seat-left': m.left, 'seat-right': m.right };
     S.pcMap = { 'pc-top': m.top, 'pc-left': m.left, 'pc-right': m.right, 'pc-bottom': S.myId };
+    const bs = $('seat-bottom'); if (bs) bs.classList.add('hidden');
 }
 
-/* ============ LOBBY ============ */
+/* LOBBY */
 const btnJoin = $('btn-join');
 if (btnJoin) btnJoin.addEventListener('click', () => {
     const name = $('input-name').value.trim() || 'Player';
     const room = $('input-room').value.trim();
     const pass = $('input-pass').value.trim();
     if (!room) return showLobbyMsg('Enter a Room ID');
+    if (typeof SoundSystem !== 'undefined') SoundSystem.click();
     socket.emit('joinRoom', { roomId: room, playerName: name, password: pass || null });
 });
 
@@ -42,6 +50,7 @@ const btnBot = $('btn-bot');
 if (btnBot) btnBot.addEventListener('click', () => {
     const name = $('input-name').value.trim() || 'You';
     const roomId = 'bot_' + Math.random().toString(36).slice(2, 8);
+    if (typeof SoundSystem !== 'undefined') SoundSystem.click();
     socket.emit('startBotGame', { roomId, playerName: name });
 });
 
@@ -50,6 +59,7 @@ if (btnSpectate) btnSpectate.addEventListener('click', () => {
     const name = $('input-name').value.trim() || 'Spectator';
     const room = $('input-room').value.trim();
     if (!room) return showLobbyMsg('Enter Room ID to spectate');
+    if (typeof SoundSystem !== 'undefined') SoundSystem.click();
     socket.emit('joinRoom', { roomId: room, playerName: name, isSpectator: true });
 });
 
@@ -60,9 +70,11 @@ function showLobbyMsg(msg) {
     setTimeout(() => el.textContent = '', 3500);
 }
 
-/* ============ SOCKET ============ */
+/* SOCKET */
 socket.on('joined', data => {
-    S.myId = data.playerId; S.roomId = data.roomId; S.isSpectator = !!data.isSpectator;
+    S.myId = data.playerId;
+    S.roomId = data.roomId;
+    S.isSpectator = !!data.isSpectator;
     const l = $('lobby'); if (l) l.classList.add('hidden');
     const g = $('game'); if (g) g.classList.remove('hidden');
     buildMaps();
@@ -84,38 +96,52 @@ socket.on('roomUpdate', data => {
 });
 
 socket.on('gameStart', data => {
-    S.myId = data.yourId; S.myHand = data.yourHand || [];
-    S.phase = data.phase; S.currentBid = data.currentBid;
-    S.teamAScore = data.teamAScore || 0; S.teamBScore = data.teamBScore || 0;
+    S.myId = data.yourId;
+    S.myHand = data.yourHand || [];
+    S.phase = data.phase;
+    S.currentBid = data.currentBid;
+    S.teamAScore = data.teamAScore || 0;
+    S.teamBScore = data.teamBScore || 0;
     S.netScore = data.netScore || 0;
     S.totalTricks = data.phase === 'warmup' ? 5 : 13;
-    S.revealedHand = null; S.revealedOwnerId = null;
-    S.bidWinnerId = null; S.trumpSuit = null;
-    S.playerBids = {}; S.leadPlayerId = null;
-    S.isPlayingCard = false; S.lastResolvedTrick = -1;
+    S.revealedHand = null;
+    S.revealedOwnerId = null;
+    S.bidWinnerId = null;
+    S.trumpSuit = null;
+    S.playerBids = {};
+    S.leadPlayerId = null;
+    S.isPlayingCard = false;
+    S.lastResolvedTrick = -1;
     buildMaps();
     data.players.forEach(p => {
-        S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
-        S.handSizes[p.id] = p.handSize; S.tricks[p.id] = p.tricks;
+        S.playerNames[p.id] = p.name;
+        S.playerTeams[p.id] = p.team;
+        S.handSizes[p.id] = p.handSize;
+        S.tricks[p.id] = p.tricks;
     });
     S.bidHistory = data.bidHistory || [];
-    renderBidHistory(); renderBidBadges();
+    renderBidHistory();
+    renderBidBadges();
     const tc = $('teammate-cards'); if (tc) tc.classList.add('hidden');
     document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active', 'bid-winner', 'leader'));
     renderGame();
     renderAllSeats();
     if (data.currentBidderId && data.currentBidderId !== S.myId) renderBidTurnGlow(data.currentBidderId);
-    if (data.currentBidderId === S.myId) renderBidUI();
+    if (data.currentBidderId === S.myId && !S.isSpectator) renderBidUI();
 });
 
 socket.on('bidUpdate', data => {
-    S.currentBid = data.currentBid; S.highestBid = data.highestBid;
+    S.currentBid = data.currentBid;
+    S.highestBid = data.highestBid;
     S.highestBidderId = data.highestBidderId;
-    S.biddingActive = data.biddingActive; S.nextBidderId = data.nextBidderId;
-    S.phase = data.phase; S.bidHistory = data.bidHistory || [];
+    S.biddingActive = data.biddingActive;
+    S.nextBidderId = data.nextBidderId;
+    S.phase = data.phase;
+    S.bidHistory = data.bidHistory || [];
     parseBidHistory(S.bidHistory);
-    renderBidHistory(); renderBidBadges();
+    renderBidHistory();
+    renderBidBadges();
     if (data.biddingActive && data.nextBidderId) renderBidTurnGlow(data.nextBidderId);
     else document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     if (data.biddingActive && data.nextBidderId === S.myId && !S.isSpectator) renderBidUI();
@@ -123,7 +149,8 @@ socket.on('bidUpdate', data => {
 });
 
 socket.on('biddingFinished', data => {
-    S.highestBid = data.highestBid; S.highestBidderId = data.highestBidderId;
+    S.highestBid = data.highestBid;
+    S.highestBidderId = data.highestBidderId;
     S.biddingActive = false;
     const bu = $('bid-ui'); if (bu) bu.classList.remove('active');
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
@@ -136,8 +163,10 @@ socket.on('biddingFinished', data => {
 socket.on('warmupSkipped', () => {});
 
 socket.on('trumpSet', data => {
-    S.trumpSuit = data.trumpSuit; S.highestBidderId = data.highestBidderId;
+    S.trumpSuit = data.trumpSuit;
+    S.highestBidderId = data.highestBidderId;
     updateTrumpIndicator();
+    if (typeof SoundSystem !== 'undefined') SoundSystem.trumpSet();
     if (data.waitReveal && data.highestBidderId === S.myId && !S.isSpectator) {
         const rm = $('reveal-modal'); if (rm) rm.classList.remove('hidden');
     }
@@ -153,19 +182,30 @@ socket.on('roundStarted', data => {
     S.revealedHand = data.revealedHand;
     S.revealedOwnerId = data.revealedOwnerId;
     S.bidWinnerId = data.bidWinnerId;
-    S.phase = data.phase; S.totalTricks = data.totalTricks;
-    S.isPlayingCard = false; S.lastResolvedTrick = -1;
+    S.phase = data.phase;
+    S.totalTricks = data.totalTricks;
+    S.isPlayingCard = false;
+    S.lastResolvedTrick = -1;
     document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
-    data.handSizes.forEach(h => { S.handSizes[h.id] = h.size; S.tricks[h.id] = h.tricks; });
+    data.handSizes.forEach(h => {
+        S.handSizes[h.id] = h.size;
+        S.tricks[h.id] = h.tricks;
+    });
     if (S.revealedHand && S.revealedHand.length > 0) {
         const tc = $('teammate-cards'); if (tc) tc.classList.remove('hidden');
         renderTeammateHand();
     }
-    updateTrumpIndicator(); renderGame(); renderCrown(); renderLeaderStar(); renderBidBadges();
+    updateTrumpIndicator();
+    renderGame();
+    renderCrown();
+    renderLeaderStar();
+    renderBidBadges();
 });
 
 socket.on('cardPlayed', data => {
+    if (typeof SoundSystem !== 'undefined') SoundSystem.cardThrow();
     throwCardAnimation(data.playerId, data.card, () => {
+        if (typeof SoundSystem !== 'undefined') SoundSystem.cardLand();
         const slot = findPcSlotForPlayer(data.playerId);
         if (slot) {
             const slotEl = $(slot);
@@ -178,21 +218,30 @@ socket.on('cardPlayed', data => {
     if (data.playerId === S.myId) S.isPlayingCard = false;
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
-    renderTurnIndicator(); renderLeaderStar(); highlightPlayable();
-    if (data.wasAutoPlayed) showToast(`⏰ ${data.playerName} auto-played`, 1200);
+    renderTurnIndicator();
+    renderLeaderStar();
+    highlightPlayable();
 });
 
 socket.on('handUpdate', data => {
     S.myHand = data.hand || [];
     S.isPlayingCard = false;
-    renderMyHand(); highlightPlayable();
+    renderMyHand();
+    highlightPlayable();
 });
 
 socket.on('trickResolved', data => {
-    data.players.forEach(p => { S.tricks[p.id] = p.tricks; S.handSizes[p.id] = p.handSize; });
+    data.players.forEach(p => {
+        S.tricks[p.id] = p.tricks;
+        S.handSizes[p.id] = p.handSize;
+    });
     renderScores();
     S.isPlayingCard = false;
     if (data.bidBroken) showToast('💥 Bid Broken!', 1500);
+    if (typeof SoundSystem !== 'undefined') {
+        if (data.winnerId === S.myId) SoundSystem.trickWin();
+        else SoundSystem.trickLoss();
+    }
     const thisTrick = data.trickNumber;
     S.lastResolvedTrick = thisTrick;
     setTimeout(() => {
@@ -202,7 +251,11 @@ socket.on('trickResolved', data => {
     }, 800);
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
-    renderTurnIndicator(); renderLeaderStar();
+    renderTurnIndicator();
+    renderLeaderStar();
+    if (data.nextPlayerId === S.myId && !S.isSpectator && typeof SoundSystem !== 'undefined') {
+        SoundSystem.yourTurn();
+    }
 });
 
 socket.on('revealedHandUpdate', data => {
@@ -218,12 +271,21 @@ socket.on('roundEnd', data => {
     if (data.netScore !== undefined) S.netScore = data.netScore;
     if (data.teamAScore !== undefined) S.teamAScore = data.teamAScore;
     if (data.teamBScore !== undefined) S.teamBScore = data.teamBScore;
+    if (typeof SoundSystem !== 'undefined') {
+        if (data.won === false || data.success === false) SoundSystem.bidFailed();
+        else SoundSystem.bidMade();
+    }
     renderScores();
     showRoundEnd(data);
 });
 
 socket.on('gameOver', data => {
     if (data.netScore !== undefined) S.netScore = data.netScore;
+    if (typeof SoundSystem !== 'undefined') {
+        const myTeam = S.playerTeams[S.myId] || 'A';
+        if (data.winner === myTeam) SoundSystem.gameWin();
+        else SoundSystem.gameLose();
+    }
     showGameOver(data);
 });
 
@@ -232,26 +294,41 @@ socket.on('gameRestarted', () => {
     const re = $('round-end-modal'); if (re) re.classList.add('hidden');
 });
 
-socket.on('restartVotesUpdate', data => { const el = $('vote-badge'); if (el) el.textContent = data.total; });
-socket.on('errorMsg', msg => { console.warn('Server error:', msg); S.isPlayingCard = false; });
+socket.on('restartVotesUpdate', data => {
+    const el = $('vote-badge'); if (el) el.textContent = data.total;
+});
+
+socket.on('errorMsg', msg => {
+    console.warn('Server error:', msg);
+    S.isPlayingCard = false;
+});
+
 socket.on('playerLeft', data => console.log(data.playerName + ' left'));
 
 socket.on('spectatorJoined', data => {
     if (!data.room) return;
-    S.teamAScore = data.room.teamAScore; S.teamBScore = data.room.teamBScore;
+    S.isSpectator = true;
+    S.teamAScore = data.room.teamAScore || 0;
+    S.teamBScore = data.room.teamBScore || 0;
     S.phase = data.room.phase;
+    S.totalTricks = data.room.phase === 'warmup' ? 5 : 13;
     data.room.players.forEach(p => {
-        S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
-        S.handSizes[p.id] = p.handSize; S.tricks[p.id] = p.tricks;
+        S.playerNames[p.id] = p.name;
+        S.playerTeams[p.id] = p.team;
+        S.handSizes[p.id] = p.handSize;
+        S.tricks[p.id] = p.tricks;
     });
+    buildMaps();
     renderGame();
+    renderAllSeats();
 });
 
-/* ============ CARD THROW ANIMATION ============ */
+/* CARD THROW ANIMATION */
 function throwCardAnimation(playerId, card, callback) {
     let seatSelector = null;
-    if (playerId === S.myId) seatSelector = '#my-avatar-row .my-avatar-inner';
-    else {
+    if (playerId === S.myId && !S.isSpectator) {
+        seatSelector = '#my-avatar-row .my-avatar-inner';
+    } else {
         const seatId = findSeatForPlayer(playerId);
         if (seatId) seatSelector = '#' + seatId + ' .player-avatar';
     }
@@ -265,7 +342,7 @@ function throwCardAnimation(playerId, card, callback) {
 
     const flyCard = document.createElement('div');
     const isRed = card.suit === '♥️' || card.suit === '♦️';
-    flyCard.className = 'card flying-card ' + (isRed ? 'red' : 'black');
+    flyCard.className = 'flying-card ' + (isRed ? 'red' : 'black');
     flyCard.innerHTML = `<div class="c-rank">${card.rank}</div><div class="c-suit">${card.suit}</div>`;
 
     const cardW = 46, cardH = 66;
@@ -290,11 +367,6 @@ function throwCardAnimation(playerId, card, callback) {
     const dy = endY - startY;
     const rotation = (Math.random() * 30 - 15) + 720;
 
-    try {
-        const snd = $('throw-sound');
-        if (snd) { snd.currentTime = 0; snd.volume = 0.3; snd.play().catch(() => {}); }
-    } catch (e) {}
-
     requestAnimationFrame(() => {
         flyCard.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.6, 0.35, 1), opacity 0.5s ease-out';
         flyCard.style.transform = `translate(${dx}px, ${dy}px) scale(1) rotate(${rotation}deg)`;
@@ -304,20 +376,22 @@ function throwCardAnimation(playerId, card, callback) {
     setTimeout(() => { flyCard.remove(); callback(); }, 520);
 }
 
-/* ============ HELPERS ============ */
+/* HELPERS */
 function findPcSlotForPlayer(pid) {
-    if (pid === S.myId) return 'pc-bottom';
+    if (!S.isSpectator && pid === S.myId) return 'pc-bottom';
     for (const slot in S.pcMap) if (S.pcMap[slot] === pid) return slot;
     return null;
 }
 function findSeatForPlayer(pid) {
-    if (pid === S.myId) return null;
+    if (!S.isSpectator && pid === S.myId) return null;
     for (const seat in S.seatMap) if (S.seatMap[seat] === pid) return seat;
     return null;
 }
-
 function renderAllSeats() {
-    ['seat-top', 'seat-left', 'seat-right'].forEach(seatId => {
+    const allSeats = S.isSpectator
+        ? ['seat-top', 'seat-left', 'seat-right', 'seat-bottom']
+        : ['seat-top', 'seat-left', 'seat-right'];
+    allSeats.forEach(seatId => {
         const pid = S.seatMap[seatId];
         if (!pid) return;
         const seatEl = $(seatId);
@@ -329,7 +403,7 @@ function renderAllSeats() {
     });
 }
 
-/* ============ RENDERING ============ */
+/* RENDERING */
 function renderGame() {
     renderMyHand(); renderScores(); renderTurnIndicator();
     updateTrumpIndicator(); renderCrown(); renderLeaderStar();
@@ -343,7 +417,6 @@ function renderGame() {
         if (myNameEl) myNameEl.textContent = S.playerNames[S.myId];
     }
 }
-
 function renderMyHand() {
     if (S.isSpectator) return;
     const el = $('player1-cards');
@@ -356,7 +429,6 @@ function renderMyHand() {
         el.appendChild(cardEl);
     });
 }
-
 function makeCardEl(card) {
     const el = document.createElement('div');
     const isRed = card.suit === '♥️' || card.suit === '♦️';
@@ -364,7 +436,6 @@ function makeCardEl(card) {
     el.innerHTML = `<div class="c-rank">${card.rank}</div><div class="c-suit">${card.suit}</div>`;
     return el;
 }
-
 function renderScores() {
     const net = S.netScore || 0;
     const aScore = Math.max(0, net);
@@ -373,41 +444,38 @@ function renderScores() {
     const bEl = $('score-b'); if (bEl) bEl.textContent = bScore;
     renderAllSeats();
     const myTrickEl = $('my-tricks'); if (myTrickEl) myTrickEl.textContent = S.tricks[S.myId] || 0;
-    const trickEl = $('tricks-label'); if (trickEl) trickEl.textContent = `${S.tricks[S.myId] || 0}/${S.totalTricks}`;
+    const trickEl = $('tricks-label');
+    if (trickEl) trickEl.textContent = `${S.tricks[S.myId] || 0}/${S.totalTricks}`;
 }
-
 function renderTurnIndicator() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
-    if (S.currentPlayerId && S.currentPlayerId !== S.myId) {
+    if (S.currentPlayerId) {
         const seatId = findSeatForPlayer(S.currentPlayerId);
         if (seatId) { const el = $(seatId); if (el) el.classList.add('active'); }
     }
     highlightPlayable();
 }
-
 function renderBidTurnGlow(bidderId) {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
-    if (bidderId && bidderId !== S.myId) {
+    if (bidderId) {
         const seatId = findSeatForPlayer(bidderId);
         if (seatId) { const el = $(seatId); if (el) el.classList.add('active'); }
     }
 }
-
 function renderLeaderStar() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('leader'));
-    if (S.leadPlayerId !== null && S.leadPlayerId !== S.myId) {
+    if (S.leadPlayerId !== null) {
         const seatId = findSeatForPlayer(S.leadPlayerId);
         if (seatId) { const el = $(seatId); if (el) el.classList.add('leader'); }
     }
 }
-
 function highlightPlayable() {
     document.querySelectorAll('#player1-cards .card').forEach(c => c.classList.remove('playable'));
+    if (S.isSpectator) return;
     if (S.currentPlayerId !== S.myId) return;
     if (!S.myHand.length) return;
     document.querySelectorAll('#player1-cards .card').forEach(c => c.classList.add('playable'));
 }
-
 function updateTrumpIndicator() {
     const el = $('trump-indicator');
     if (!el) return;
@@ -422,7 +490,6 @@ function updateTrumpIndicator() {
         if (n) n.textContent = S.playerNames[S.highestBidderId] || 'Trump';
     }
 }
-
 function renderBidUI() {
     let container = $('main-bid-buttons');
     if (!container) {
@@ -438,11 +505,19 @@ function renderBidUI() {
     if (S.phase === 'warmup') {
         const bidBtn = document.createElement('button');
         bidBtn.textContent = 'Bid 5';
-        bidBtn.onclick = () => { socket.emit('bid', { bid: 5 }); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
+        bidBtn.onclick = () => {
+            if (typeof SoundSystem !== 'undefined') SoundSystem.bidPlaced();
+            socket.emit('bid', { bid: 5 });
+            const bu = $('bid-ui'); if (bu) bu.classList.remove('active');
+        };
         container.appendChild(bidBtn);
         const passBtn = document.createElement('button');
         passBtn.textContent = 'PASS'; passBtn.className = 'pass-btn';
-        passBtn.onclick = () => { socket.emit('pass'); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
+        passBtn.onclick = () => {
+            if (typeof SoundSystem !== 'undefined') SoundSystem.pass();
+            socket.emit('pass');
+            const bu = $('bid-ui'); if (bu) bu.classList.remove('active');
+        };
         container.appendChild(passBtn);
         if (infoEl) infoEl.textContent = 'Warmup — Bid 5 or Pass';
     } else {
@@ -450,18 +525,25 @@ function renderBidUI() {
         for (let v = startBid; v <= 13; v++) {
             const btn = document.createElement('button');
             btn.textContent = v;
-            btn.onclick = () => { socket.emit('bid', { bid: v }); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
+            btn.onclick = () => {
+                if (typeof SoundSystem !== 'undefined') SoundSystem.bidPlaced();
+                socket.emit('bid', { bid: v });
+                const bu = $('bid-ui'); if (bu) bu.classList.remove('active');
+            };
             container.appendChild(btn);
         }
         const passBtn = document.createElement('button');
         passBtn.textContent = 'PASS'; passBtn.className = 'pass-btn';
-        passBtn.onclick = () => { socket.emit('pass'); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
+        passBtn.onclick = () => {
+            if (typeof SoundSystem !== 'undefined') SoundSystem.pass();
+            socket.emit('pass');
+            const bu = $('bid-ui'); if (bu) bu.classList.remove('active');
+        };
         container.appendChild(passBtn);
         if (infoEl) infoEl.textContent = `Bid above ${S.currentBid}`;
     }
     const bu = $('bid-ui'); if (bu) bu.classList.add('active');
 }
-
 function renderBidHistory() {
     const el = $('bid-history-list');
     if (!el) return;
@@ -477,13 +559,13 @@ function renderBidHistory() {
         el.appendChild(div);
     });
 }
-
 function parseBidHistory(history) {
     if (!history) return;
     history.forEach(entry => {
         const parts = entry.split(' → ');
         if (parts.length < 2) return;
-        const name = parts[0].trim(); const val = parts[1].trim();
+        const name = parts[0].trim();
+        const val = parts[1].trim();
         let foundId = null;
         for (const id in S.playerNames) if (S.playerNames[id] === name) { foundId = id; break; }
         if (!foundId) return;
@@ -491,10 +573,12 @@ function parseBidHistory(history) {
         else if (val.startsWith('PASS')) S.playerBids[foundId] = 'PASS';
     });
 }
-
 function renderBidBadges() {
     document.querySelectorAll('.bid-badge').forEach(b => b.remove());
-    ['seat-top', 'seat-left', 'seat-right'].forEach(seatId => {
+    const allSeats = S.isSpectator
+        ? ['seat-top', 'seat-left', 'seat-right', 'seat-bottom']
+        : ['seat-top', 'seat-left', 'seat-right'];
+    allSeats.forEach(seatId => {
         const pid = S.seatMap[seatId];
         if (!pid) return;
         const bid = S.playerBids[pid];
@@ -507,6 +591,7 @@ function renderBidBadges() {
         const wrap = seat.querySelector('.avatar-wrap');
         if (wrap) wrap.appendChild(badge);
     });
+    if (S.isSpectator) return;
     const myBid = S.playerBids[S.myId];
     const myRow = $('my-avatar-row');
     if (myRow) {
@@ -519,15 +604,13 @@ function renderBidBadges() {
         }
     }
 }
-
 function renderCrown() {
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('bid-winner'));
-    if (S.highestBidderId !== null && S.highestBidderId !== S.myId) {
+    if (S.highestBidderId !== null) {
         const seatId = findSeatForPlayer(S.highestBidderId);
         if (seatId) { const el = $(seatId); if (el) el.classList.add('bid-winner'); }
     }
 }
-
 function renderTeammateHand() {
     const el = $('teammate-cards-list');
     if (!el) return;
@@ -539,8 +622,9 @@ function renderTeammateHand() {
     if (t) t.textContent = `👀 Partner — ${owner}`;
 }
 
-/* ============ ACTIONS ============ */
+/* ACTIONS */
 function onPlayCard(idx) {
+    if (S.isSpectator) return;
     if (S.currentPlayerId !== S.myId) return;
     if (S.isPlayingCard) return;
     S.isPlayingCard = true;
@@ -562,19 +646,16 @@ if (trumpBtns) trumpBtns.addEventListener('click', e => {
         const tm = $('trump-modal'); if (tm) tm.classList.add('hidden');
     }
 });
-
 const revealYes = $('reveal-yes');
 if (revealYes) revealYes.addEventListener('click', () => {
     socket.emit('revealDecision', { decision: 'show' });
     const rm = $('reveal-modal'); if (rm) rm.classList.add('hidden');
 });
-
 const revealNo = $('reveal-no');
 if (revealNo) revealNo.addEventListener('click', () => {
     socket.emit('revealDecision', { decision: 'hide' });
     const rm = $('reveal-modal'); if (rm) rm.classList.add('hidden');
 });
-
 const toggleRevBtn = $('btn-toggle-reveal');
 if (toggleRevBtn) toggleRevBtn.addEventListener('click', () => {
     socket.emit('toggleReveal');
@@ -585,16 +666,12 @@ if (toggleRevBtn) toggleRevBtn.addEventListener('click', () => {
     const btn = $('btn-toggle-reveal');
     if (btn) btn.textContent = hidden ? '🙈 Hide' : '👀 Show';
 });
-
 const voteReset = $('btn-vote-reset');
 if (voteReset) voteReset.addEventListener('click', () => socket.emit('voteRestart'));
-
 const historyBtn = $('btn-history');
 if (historyBtn) historyBtn.addEventListener('click', () => { const h = $('history-panel'); if (h) h.classList.remove('hidden'); });
-
 const closeHistory = $('btn-close-history');
 if (closeHistory) closeHistory.addEventListener('click', () => { const h = $('history-panel'); if (h) h.classList.add('hidden'); });
-
 const clearHistory = $('btn-clear-history');
 if (clearHistory) clearHistory.addEventListener('click', () => {
     if (confirm('Clear all history?')) {
@@ -604,18 +681,16 @@ if (clearHistory) clearHistory.addEventListener('click', () => {
         if (rl) rl.innerHTML = '<div class="bid-empty">No rounds yet</div>';
     }
 });
-
 const leaveBtn = $('btn-leave');
 if (leaveBtn) leaveBtn.addEventListener('click', () => {
     if (confirm('Leave the game?')) { socket.emit('leaveRoom'); setTimeout(() => location.reload(), 300); }
 });
-
 const backLobby = $('btn-back-lobby');
 if (backLobby) backLobby.addEventListener('click', () => {
     socket.emit('leaveRoom'); setTimeout(() => location.reload(), 300);
 });
 
-/* ============ MODALS ============ */
+/* MODALS */
 function showRoundEnd(data) {
     const modal = $('round-end-modal');
     if (!modal) return;
@@ -623,7 +698,6 @@ function showRoundEnd(data) {
     const title = $('round-result-title');
     const sub = $('round-result-sub');
     const scores = $('round-scores');
-
     if (data.phase === 'warmup') {
         if (data.success) {
             if (trophy) trophy.textContent = '😅';
@@ -663,7 +737,6 @@ function showRoundEnd(data) {
     modal.classList.remove('hidden');
     setTimeout(() => modal.classList.add('hidden'), 4500);
 }
-
 function showGameOver(data) {
     const titleEl = $('game-over-title');
     const subEl = $('game-over-sub');
@@ -683,7 +756,6 @@ function showGameOver(data) {
     }
     const gm = $('game-over-modal'); if (gm) gm.classList.remove('hidden');
 }
-
 function showToast(msg, duration = 2000) {
     let toast = document.getElementById('toast-msg');
     if (!toast) {
@@ -697,11 +769,3 @@ function showToast(msg, duration = 2000) {
     clearTimeout(toast._timer);
     toast._timer = setTimeout(() => { toast.style.display = 'none'; }, duration);
 }
-
-/* Watchdog */
-setInterval(() => {
-    if (S.isSpectator) return;
-    if (!S.currentPlayerId) return;
-    if (S.phase !== 'warmup' && S.phase !== 'main') return;
-    socket.emit('forceTurnCheck');
-}, 10000);

@@ -34,20 +34,6 @@ const MAIN_TRICKS = 13;
 const REVEAL_THRESHOLD = 9;
 const WIN_SCORE = 52;
 
-const TURN_TIMEOUT = 15000;
-const BID_TIMEOUT = 10000;
-
-// ==================== TIMERS ====================
-const turnTimers = {};
-const bidTimers = {};
-
-function clearTurnTimer(roomId) {
-    if (turnTimers[roomId]) { clearTimeout(turnTimers[roomId]); delete turnTimers[roomId]; }
-}
-function clearBidTimer(roomId) {
-    if (bidTimers[roomId]) { clearTimeout(bidTimers[roomId]); delete bidTimers[roomId]; }
-}
-
 // ==================== HELPERS ====================
 function nextIndex(i) {
     const pos = RIGHT_HAND_ORDER.indexOf(i);
@@ -72,16 +58,12 @@ function sortHand(hand) {
         return RANK_VALUE[a.rank] - RANK_VALUE[b.rank];
     });
 }
-
-// ✅ FIXED: Adds exactly cardsPerPlayer cards to existing hand
 function dealRoundRobin(room, deck, cardsPerPlayer) {
     let idx = 0;
     for (let c = 0; c < cardsPerPlayer; c++) {
         for (let i = 0; i < 4; i++) {
             const p = RIGHT_HAND_DEAL_ORDER[i];
-            if (idx < deck.length) {
-                room.players[p].hand.push(deck[idx++]);
-            }
+            if (idx < deck.length) room.players[p].hand.push(deck[idx++]);
         }
     }
 }
@@ -104,47 +86,35 @@ function createRoom(roomId, password) {
         currentPlayerIndex: 0, leadSuit: null, trickCards: [], trickNumber: 0,
         bidHistory: [], teamAScore: 0, teamBScore: 0, netScore: 0,
         roundStarted: false, gameEnded: false, restartVotes: new Set(),
-        isBotGame: false, spectators: [], startingBidderIndex: 0,
-        lastActionTime: Date.now()
+        isBotGame: false, spectators: [], startingBidderIndex: 0
     };
 }
 
 // ==================== DEAL ====================
 function dealWarmup(room) {
-    clearTurnTimer(room.id); clearBidTimer(room.id);
     const deck = shuffle(createDeck());
     room.phase = PHASE_WARMUP;
     room.players.forEach(p => { p.hand = []; p.tricks = 0; });
-    dealRoundRobin(room, deck, WARMUP_CARDS);   // 5 cards each
+    dealRoundRobin(room, deck, WARMUP_CARDS);
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     resetRoundState(room, WARMUP_BID - 1);
 }
 
-// ✅ KEY FIX: Warmup ke 5 cards same rakho, 8 naye add karo = 13
 function dealMainFromWarmup(room) {
-    clearTurnTimer(room.id); clearBidTimer(room.id);
-    
-    // Warmup ke cards track karo (unhe re-deal nahi karna)
     const usedCards = new Set();
     room.players.forEach(p => p.hand.forEach(c => usedCards.add(c.rank + c.suit)));
-    
-    // Baaki 32 cards me se shuffle karo
     const availableDeck = shuffle(createDeck()).filter(c => !usedCards.has(c.rank + c.suit));
-    
-    // ✅ Existing 5 cards me 8 more add karo (5+8=13)
     dealRoundRobin(room, availableDeck, 8);
-    
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     room.phase = PHASE_MAIN;
     resetRoundState(room, MAIN_START_BID);
 }
 
 function dealMainFresh(room) {
-    clearTurnTimer(room.id); clearBidTimer(room.id);
     const deck = shuffle(createDeck());
     room.phase = PHASE_MAIN;
     room.players.forEach(p => { p.hand = []; p.tricks = 0; });
-    dealRoundRobin(room, deck, 13);   // 13 cards each
+    dealRoundRobin(room, deck, 13);
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     resetRoundState(room, MAIN_START_BID);
 }
@@ -160,59 +130,25 @@ function resetRoundState(room, startingBid) {
     room.warmupAllPassed = false; room.trumpSuit = null; room.teammateRevealed = false;
     room.revealDecision = null; room.currentPlayerIndex = 0; room.leadSuit = null;
     room.trickCards = []; room.trickNumber = 0; room.bidHistory = []; room.roundStarted = false;
-    room.lastActionTime = Date.now();
 }
 
 function getCurrentBidderIndex(room) { return RIGHT_HAND_ORDER[room.currentBidderIndex]; }
 
-// ==================== BID TIMER ====================
-function startBidTimer(room) {
-    clearBidTimer(room.id);
-    if (!room.biddingActive) return;
-    const bidderIdx = getCurrentBidderIndex(room);
-    const bidder = room.players[bidderIdx];
-    if (!bidder || bidder.isBot) return;
-    
-    bidTimers[room.id] = setTimeout(() => {
-        const still = room.players[getCurrentBidderIndex(room)];
-        if (!still || still.id !== bidder.id || !room.biddingActive) return;
-        console.log(`⏰ BID TIMEOUT: ${bidder.name} auto-pass`);
-        const res = handlePass(room, bidder.id);
-        if (!res.error) {
-            sendBidUpdate(room);
-            if (!room.biddingActive) finishBidding(room);
-            else setTimeout(() => nextBidTurn(room), 500);
-        }
-    }, BID_TIMEOUT);
-}
-
+// ==================== BID TURN ====================
 function nextBidTurn(room) {
     if (!room.biddingActive) return;
     const bidderIdx = getCurrentBidderIndex(room);
     const bidder = room.players[bidderIdx];
     if (!bidder) return;
-    
+    // ✅ Only bots auto-act
     if (bidder.isBot) {
         setTimeout(() => botBid(room, bidder), 1400);
-    } else if (bidder.connected) {
-        startBidTimer(room);
-    } else {
-        setTimeout(() => {
-            const res = handlePass(room, bidder.id);
-            if (!res.error) {
-                sendBidUpdate(room);
-                if (!room.biddingActive) finishBidding(room);
-                else setTimeout(() => nextBidTurn(room), 500);
-            }
-        }, 800);
     }
+    // Humans — wait indefinitely
 }
 
-// ✅ FIXED: Handles warmup all-pass case
 function finishBidding(room) {
-    // ✅ WARMUP ALL PASSED — direct main round
     if (room.phase === PHASE_WARMUP && room.warmupAllPassed) {
-        console.log('🎯 Warmup all passed — dealing main round (5 + 8 = 13 cards)');
         io.to(room.id).emit("warmupSkipped", {});
         setTimeout(() => {
             dealMainFromWarmup(room);
@@ -222,48 +158,30 @@ function finishBidding(room) {
         }, 1500);
         return;
     }
-    
     if (room.highestBidder === null || room.highestBidder === undefined) {
         const forced = RIGHT_HAND_ORDER[0];
         room.highestBidder = forced;
         room.highestBid = MAIN_MIN_BID;
         room.currentBid = MAIN_MIN_BID;
     }
-    
     io.to(room.id).emit("biddingFinished", {
         highestBid: room.highestBid,
         highestBidderId: room.players[room.highestBidder].id,
         highestBidderName: room.players[room.highestBidder].name,
         phase: room.phase
     });
-    
     const bidder = room.players[room.highestBidder];
+    // ✅ Only bots auto-choose trump
     if (bidder.isBot) {
         setTimeout(() => botChooseTrump(room), 1400);
-    } else if (!bidder.connected) {
-        setTimeout(() => {
-            const counts = { "♠️": 0, "♥️": 0, "♦️": 0, "♣️": 0 };
-            bidder.hand.forEach(c => counts[c.suit]++);
-            let best = "♠️", max = 0;
-            for (const s of SUITS) if (counts[s] > max) { max = counts[s]; best = s; }
-            handleTrump(room, bidder.id, best);
-            io.to(room.id).emit("trumpSet", {
-                trumpSuit: best, waitReveal: false,
-                highestBidderId: bidder.id, highestBidderName: bidder.name
-            });
-            broadcastRoundStart(room);
-            setTimeout(() => scheduleBotAction(room), 500);
-        }, 1500);
     }
+    // Human disconnected — wait forever (no auto)
 }
 
 // ==================== BIDDING ====================
 function handleBid(room, playerId, bid) {
     if (!room.biddingActive) return { error: "Bidding closed" };
     if (playerId - 1 !== getCurrentBidderIndex(room)) return { error: "Not your turn" };
-    clearBidTimer(room.id);
-    room.lastActionTime = Date.now();
-    
     if (room.phase === PHASE_WARMUP) {
         if (bid !== WARMUP_BID) return { error: "Warmup mein sirf Bid 5 possible hai" };
         room.currentBid = WARMUP_BID; room.highestBid = WARMUP_BID; room.highestBidder = playerId - 1;
@@ -286,10 +204,7 @@ function handleBid(room, playerId, bid) {
 function handlePass(room, playerId) {
     if (!room.biddingActive) return { error: "Bidding closed" };
     if (playerId - 1 !== getCurrentBidderIndex(room)) return { error: "Not your turn" };
-    clearBidTimer(room.id);
-    room.lastActionTime = Date.now();
     room.bidHistory.push(`${room.players[playerId - 1].name} → PASS`);
-    
     if (room.phase === PHASE_WARMUP) {
         room.bidsMade++;
         if (room.bidsMade >= 4) {
@@ -312,7 +227,6 @@ function advanceMainBidder(room) {
             room.highestBidder = forced;
             room.highestBid = MAIN_MIN_BID;
             room.currentBid = MAIN_MIN_BID;
-            room.bidHistory.push(`⚠️ All passed — forced bid ${MAIN_MIN_BID} on ${room.players[forced].name}`);
         }
         room.biddingActive = false;
         return;
@@ -346,7 +260,6 @@ function startCardRound(room) {
     room.currentPlayerIndex = room.highestBidder;
     room.trickNumber = 0; room.trickCards = []; room.leadSuit = null;
     room.players.forEach(p => p.tricks = 0);
-    room.lastActionTime = Date.now();
 }
 
 function canPlayCard(room, playerIndex, card) {
@@ -368,77 +281,12 @@ function handlePlayCard(room, playerId, cardIndex) {
     const card = player.hand[cardIndex];
     if (!card) return { error: "Invalid card" };
     if (!canPlayCard(room, idx, card)) return { error: "Must follow lead suit" };
-    
-    clearTurnTimer(room.id);
-    room.lastActionTime = Date.now();
-    
     if (room.trickCards.length === 0) room.leadSuit = card.suit;
     player.hand.splice(cardIndex, 1);
     room.trickCards.push({ playerIndex: idx, card });
     if (room.trickCards.length === 4) return { ok: true, resolveTrick: true };
     room.currentPlayerIndex = nextIndex(room.currentPlayerIndex);
     return { ok: true };
-}
-
-// ==================== TURN TIMER ====================
-function startTurnTimer(room) {
-    clearTurnTimer(room.id);
-    if (!room.roundStarted) return;
-    const currentPlayer = room.players[room.currentPlayerIndex];
-    if (!currentPlayer) return;
-    if (currentPlayer.isBot) return;
-    if (!currentPlayer.connected) {
-        setTimeout(() => autoPlayForPlayer(room, currentPlayer.id), 1500);
-        return;
-    }
-    
-    turnTimers[room.id] = setTimeout(() => {
-        const still = room.players[room.currentPlayerIndex];
-        if (!still || still.id !== currentPlayer.id || !room.roundStarted) return;
-        console.log(`⏰ TURN TIMEOUT: ${currentPlayer.name} auto-play`);
-        autoPlayForPlayer(room, currentPlayer.id);
-    }, TURN_TIMEOUT);
-}
-
-function autoPlayForPlayer(room, playerId) {
-    const player = room.players[playerId - 1];
-    if (!player || !room.roundStarted) return;
-    if (room.currentPlayerIndex !== playerId - 1) return;
-    
-    const playable = player.hand.filter(c => canPlayCard(room, playerId - 1, c));
-    const choices = playable.length > 0 ? playable : player.hand;
-    if (choices.length === 0) return;
-    
-    choices.sort((a, b) => RANK_VALUE[a.rank] - RANK_VALUE[b.rank]);
-    const card = choices[0];
-    const idx = player.hand.indexOf(card);
-    
-    const res = handlePlayCard(room, playerId, idx);
-    if (res.error) {
-        const res2 = handlePlayCard(room, playerId, 0);
-        if (res2.error) { console.error('❌ Auto-play failed:', res2.error); return; }
-    }
-    
-    const pidPlayer = room.players[playerId - 1];
-    if (pidPlayer && pidPlayer.socketId) {
-        io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
-    }
-    
-    io.to(room.id).emit("cardPlayed", {
-        playerId: playerId,
-        playerName: pidPlayer.name,
-        card: room.trickCards[room.trickCards.length - 1].card,
-        trickCards: room.trickCards,
-        nextPlayerId: room.trickCards.length < 4 ? room.players[room.currentPlayerIndex].id : null,
-        leadPlayerId: room.trickCards[0].playerIndex + 1,
-        wasAutoPlayed: true
-    });
-    
-    if (room.trickCards.length === 4) handleTrickResolve(room);
-    else {
-        startTurnTimer(room);
-        setTimeout(() => scheduleBotAction(room), 400);
-    }
 }
 
 // ==================== TRICK RESOLVE ====================
@@ -485,7 +333,6 @@ function handleTrickResolve(room) {
                 }
             }
         } else {
-            startTurnTimer(room);
             setTimeout(() => scheduleBotAction(room), 500);
         }
     }, 1200);
@@ -497,8 +344,6 @@ function resolveTrick(room) {
     room.trickNumber++;
     room.trickCards = []; room.leadSuit = null;
     room.currentPlayerIndex = winner;
-    room.lastActionTime = Date.now();
-    
     if (room.phase === PHASE_WARMUP && room.highestBidder !== null) {
         const bidderTeam = room.players[room.highestBidder].team;
         const winnerTeam = room.players[winner].team;
@@ -548,14 +393,13 @@ function isBidBroken(room) {
     return false;
 }
 
-// ==================== ROUND END (NET SCORE) ====================
+// ==================== ROUND END ====================
 function finishWarmup(room) {
     room.roundStarted = false;
     const bidderTeam = room.players[room.highestBidder].team;
     let tricksWon = 0;
     TEAMS[bidderTeam].forEach(num => tricksWon += room.players[num - 1].tricks);
     const success = tricksWon >= WARMUP_BID;
-    
     if (success) {
         if (bidderTeam === "A") room.netScore += WARMUP_PENALTY;
         else room.netScore -= WARMUP_PENALTY;
@@ -563,14 +407,9 @@ function finishWarmup(room) {
         if (bidderTeam === "A") room.netScore -= WARMUP_PENALTY;
         else room.netScore += WARMUP_PENALTY;
     }
-    
     room.teamAScore = Math.max(0, room.netScore);
     room.teamBScore = Math.max(0, -room.netScore);
-    
-    return {
-        phase: PHASE_WARMUP, success, bidderTeam, tricks: tricksWon,
-        netScore: room.netScore, teamAScore: room.teamAScore, teamBScore: room.teamBScore
-    };
+    return { phase: PHASE_WARMUP, success, bidderTeam, tricks: tricksWon, netScore: room.netScore, teamAScore: room.teamAScore, teamBScore: room.teamBScore };
 }
 
 function finishMain(room) {
@@ -579,29 +418,14 @@ function finishMain(room) {
     let tricksWon = 0;
     TEAMS[bidderTeam].forEach(num => tricksWon += room.players[num - 1].tricks);
     const won = tricksWon >= room.highestBid;
-    
-    let pointsChange;
-    if (won) pointsChange = room.highestBid;
-    else pointsChange = -(room.highestBid * 2);
-    
+    let pointsChange = won ? room.highestBid : -(room.highestBid * 2);
     if (bidderTeam === "A") room.netScore += pointsChange;
     else room.netScore -= pointsChange;
-    
     room.teamAScore = Math.max(0, room.netScore);
     room.teamBScore = Math.max(0, -room.netScore);
-    
-    if (Math.abs(room.netScore) >= WIN_SCORE) {
-        room.gameEnded = room.netScore > 0 ? "A" : "B";
-    } else {
-        room.gameEnded = false;
-    }
-    
-    return {
-        phase: PHASE_MAIN, team: bidderTeam, tricks: tricksWon,
-        bid: room.highestBid, sar: pointsChange, won,
-        netScore: room.netScore, teamAScore: room.teamAScore, teamBScore: room.teamBScore,
-        gameOver: room.gameEnded
-    };
+    if (Math.abs(room.netScore) >= WIN_SCORE) room.gameEnded = room.netScore > 0 ? "A" : "B";
+    else room.gameEnded = false;
+    return { phase: PHASE_MAIN, team: bidderTeam, tricks: tricksWon, bid: room.highestBid, sar: pointsChange, won, netScore: room.netScore, teamAScore: room.teamAScore, teamBScore: room.teamBScore, gameOver: room.gameEnded };
 }
 
 // ==================== BROADCAST ====================
@@ -618,7 +442,7 @@ function sendGameStart(room) {
                 bidHistory: room.bidHistory,
                 teamAScore: room.teamAScore, teamBScore: room.teamBScore, netScore: room.netScore
             });
-        } catch (e) { console.error(e.message); }
+        } catch (e) {}
     });
     io.to(room.id).emit("spectatorGameStart", {
         phase: room.phase,
@@ -638,14 +462,14 @@ function sendBidUpdate(room) {
             nextBidderId: room.biddingActive && room.players[bidderIdx] ? room.players[bidderIdx].id : null,
             biddingActive: room.biddingActive, phase: room.phase
         });
-    } catch (e) { console.error(e.message); }
+    } catch (e) {}
 }
 
 function broadcastRoundStart(room) {
     if (!room || !room.players) return;
     let revealedHand = null, revealedOwnerId = null;
     try {
-        if (room.teammateRevealed && room.highestBidder !== null && room.highestBidder !== undefined && room.players[room.highestBidder]) {
+        if (room.teammateRevealed && room.highestBidder !== null && room.players[room.highestBidder]) {
             const bidderId = room.players[room.highestBidder].id;
             const mateId = TEAMMATES[bidderId];
             if (mateId && room.players[mateId - 1]) {
@@ -653,10 +477,8 @@ function broadcastRoundStart(room) {
                 revealedOwnerId = mateId;
             }
         }
-    } catch (e) { console.error(e.message); }
-
-    const bidWinnerId = (room.highestBidder !== null && room.highestBidder !== undefined && room.players[room.highestBidder]) ? room.players[room.highestBidder].id : null;
-
+    } catch (e) {}
+    const bidWinnerId = (room.highestBidder !== null && room.players[room.highestBidder]) ? room.players[room.highestBidder].id : null;
     room.players.forEach(p => {
         if (!p || p.isBot || !p.socketId || !p.connected) return;
         try {
@@ -669,9 +491,8 @@ function broadcastRoundStart(room) {
                 revealedHand, revealedOwnerId, bidWinnerId,
                 totalTricks: room.phase === PHASE_WARMUP ? WARMUP_TRICKS : MAIN_TRICKS
             });
-        } catch (e) { console.error(e.message); }
+        } catch (e) {}
     });
-    setTimeout(() => startTurnTimer(room), 500);
 }
 
 function broadcastRevealedHandUpdate(room) {
@@ -681,7 +502,7 @@ function broadcastRevealedHandUpdate(room) {
     if (!mateId || !room.players[mateId - 1]) return;
     try {
         io.to(room.id).emit("revealedHandUpdate", { revealedHand: room.players[mateId - 1].hand, revealedOwnerId: mateId });
-    } catch (e) { console.error(e.message); }
+    } catch (e) {}
 }
 
 // ==================== BOT AI ====================
@@ -702,8 +523,6 @@ function botBid(room, bot) {
     if (!room.biddingActive) return;
     if (!room.players[getCurrentBidderIndex(room)]) return;
     if (room.players[getCurrentBidderIndex(room)].id !== bot.id) return;
-    room.lastActionTime = Date.now();
-    
     if (room.phase === PHASE_WARMUP) {
         const shouldBid = Math.random() > 0.5;
         if (shouldBid) handleBid(room, bot.id, 5); else handlePass(room, bot.id);
@@ -759,8 +578,6 @@ function botPlay(room, bot) {
     if (!room.roundStarted) return;
     if (!room.players[room.currentPlayerIndex]) return;
     if (room.players[room.currentPlayerIndex].id !== bot.id) return;
-    room.lastActionTime = Date.now();
-    
     const playable = bot.hand.filter(c => canPlayCard(room, bot.id - 1, c));
     const choices = playable.length > 0 ? playable : bot.hand;
     if (choices.length === 0) return;
@@ -784,10 +601,7 @@ function botPlay(room, bot) {
         leadPlayerId: room.trickCards[0].playerIndex + 1
     });
     if (res.resolveTrick) handleTrickResolve(room);
-    else {
-        startTurnTimer(room);
-        setTimeout(() => scheduleBotAction(room), 500);
-    }
+    else setTimeout(() => scheduleBotAction(room), 500);
 }
 
 // ==================== SOCKET ====================
@@ -802,7 +616,6 @@ io.on("connection", socket => {
                 return;
             }
         }
-
         if (rooms[roomId]) {
             const room = rooms[roomId];
             const anyConnected = room.players.some(p => p.connected);
@@ -810,7 +623,6 @@ io.on("connection", socket => {
                 if (!password || password !== room.password) return socket.emit("joinError", "Galat password!");
             }
         } else rooms[roomId] = createRoom(roomId, password || null);
-
         const room = rooms[roomId];
 
         if (isSpectator) {
@@ -831,10 +643,8 @@ io.on("connection", socket => {
 
         const seat = room.players.find(p => !p.connected);
         if (!seat) return socket.emit("joinError", "Room full — try Spectate mode");
-
         seat.connected = true;
         seat.socketId = socket.id;
-
         const desiredName = (playerName || 'Player').trim().slice(0, 15) || 'Player';
         let finalName = desiredName;
         let suffix = 2;
@@ -844,16 +654,13 @@ io.on("connection", socket => {
             if (suffix > 20) break;
         }
         seat.name = finalName;
-
         socket.join(roomId);
         socket.data.roomId = roomId;
         socket.data.playerId = seat.id;
         socket.emit("joined", { playerId: seat.id, roomId });
-
         io.to(roomId).emit("roomUpdate", {
             players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot }))
         });
-
         const allConnected = room.players.every(p => p.connected);
         if (allConnected && !room.biddingActive && !room.roundStarted && !room.gameEnded) {
             dealWarmup(room);
@@ -869,26 +676,21 @@ io.on("connection", socket => {
         const room = rooms[roomId];
         room.isBotGame = true;
         room.startingBidderIndex = 0;
-
         const humanSeat = room.players[0];
         humanSeat.connected = true;
         humanSeat.socketId = socket.id;
         humanSeat.name = (playerName || "You").trim().slice(0, 15) || "You";
         humanSeat.isBot = false;
-
         socket.join(roomId);
         socket.data.roomId = roomId;
         socket.data.playerId = 1;
-
         room.players[1].connected = true; room.players[1].isBot = true; room.players[1].name = "🤖 Bot 2"; room.players[1].socketId = null;
         room.players[2].connected = true; room.players[2].isBot = true; room.players[2].name = "🤖 Bot 3"; room.players[2].socketId = null;
         room.players[3].connected = true; room.players[3].isBot = true; room.players[3].name = "🤖 Bot 4"; room.players[3].socketId = null;
-
         socket.emit("joined", { playerId: 1, roomId });
         io.to(roomId).emit("roomUpdate", {
             players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot }))
         });
-
         dealMainFresh(room);
         sendGameStart(room);
         sendBidUpdate(room);
@@ -959,11 +761,8 @@ io.on("connection", socket => {
         const pid = socket.data.playerId;
         const res = handlePlayCard(room, pid, cardIndex);
         if (res.error) return socket.emit("errorMsg", res.error);
-
         const pidPlayer = room.players[pid - 1];
-        if (pidPlayer && pidPlayer.socketId) {
-            io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
-        }
+        if (pidPlayer && pidPlayer.socketId) io.to(pidPlayer.socketId).emit("handUpdate", { hand: pidPlayer.hand });
         if (room.teammateRevealed && room.highestBidder !== null) {
             const mateId = TEAMMATES[room.players[room.highestBidder].id];
             if (mateId && pid === mateId) broadcastRevealedHandUpdate(room);
@@ -975,25 +774,8 @@ io.on("connection", socket => {
             nextPlayerId: room.trickCards.length < 4 ? room.players[room.currentPlayerIndex].id : null,
             leadPlayerId: room.trickCards[0].playerIndex + 1
         });
-
         if (res.resolveTrick) handleTrickResolve(room);
-        else {
-            startTurnTimer(room);
-            setTimeout(() => scheduleBotAction(room), 500);
-        }
-    });
-
-    socket.on("forceTurnCheck", () => {
-        const room = rooms[socket.data.roomId];
-        if (!room || !room.roundStarted) return;
-        const currentPlayer = room.players[room.currentPlayerIndex];
-        if (!currentPlayer) return;
-        const timeSince = Date.now() - room.lastActionTime;
-        if (timeSince > 12000) {
-            console.log(`⚠️ Force action for ${currentPlayer.name} (${Math.floor(timeSince/1000)}s)`);
-            if (currentPlayer.isBot) botPlay(room, currentPlayer);
-            else autoPlayForPlayer(room, currentPlayer.id);
-        }
+        else setTimeout(() => scheduleBotAction(room), 500);
     });
 
     socket.on("voteRestart", () => {
@@ -1018,8 +800,6 @@ io.on("connection", socket => {
         const roomId = socket.data.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
-        clearTurnTimer(roomId); clearBidTimer(roomId);
-        
         if (socket.data.isSpectator) {
             room.spectators = room.spectators.filter(s => s.socketId !== socket.id);
             socket.leave(roomId); socket.data.roomId = null; socket.data.isSpectator = false;
@@ -1041,7 +821,6 @@ io.on("connection", socket => {
         const roomId = socket.data.roomId;
         if (!roomId || !rooms[roomId]) return;
         const room = rooms[roomId];
-
         if (socket.data.isSpectator) {
             room.spectators = room.spectators.filter(s => s.socketId !== socket.id);
             return;
@@ -1050,25 +829,6 @@ io.on("connection", socket => {
         if (player) {
             player.connected = false; player.socketId = null;
             room.restartVotes.delete(player.id);
-            console.log(`❌ P${player.id} (${player.name}) disconnected`);
-            
-            if (room.roundStarted && room.players[room.currentPlayerIndex].id === player.id) {
-                setTimeout(() => autoPlayForPlayer(room, player.id), 1500);
-            }
-            if (room.biddingActive) {
-                const bidderIdx = getCurrentBidderIndex(room);
-                if (room.players[bidderIdx].id === player.id) {
-                    setTimeout(() => {
-                        const res = handlePass(room, player.id);
-                        if (!res.error) {
-                            sendBidUpdate(room);
-                            if (!room.biddingActive) finishBidding(room);
-                            else setTimeout(() => nextBidTurn(room), 400);
-                        }
-                    }, 1000);
-                }
-            }
-            
             io.to(roomId).emit("roomUpdate", { players: room.players.map(p => ({ id: p.id, name: p.name, connected: p.connected, team: p.team, isBot: p.isBot })) });
         }
     });

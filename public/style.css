@@ -209,6 +209,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .seat-top { grid-area: top; justify-content: flex-start; }
 .seat-left { grid-area: left; align-items: flex-start; justify-content: center; }
 .seat-right { grid-area: right; align-items: flex-end; justify-content: center; }
+.seat-bottom { grid-area: bottom; justify-content: flex-end; align-items: center; }
+.seat-bottom .avatar-wrap { margin-bottom: 8px; }
 
 /* ======================================================
    PLAYED CARDS — FLOATING
@@ -270,7 +272,6 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     box-shadow: 0 4px 10px rgba(0,0,0,0.4);
 }
 
-/* RED GLOW */
 .seat.active .player-avatar {
     box-shadow: 0 0 0 3px #ff3333, 0 0 20px 6px rgba(255,51,51,0.85);
     transform: scale(1.08);
@@ -280,16 +281,12 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     0%, 100% { box-shadow: 0 0 0 3px #ff3333, 0 0 18px 4px rgba(255,51,51,0.75); }
     50% { box-shadow: 0 0 0 5px #ff5555, 0 0 32px 8px rgba(255,51,51,1); }
 }
-
-/* STAR — lead player */
 .seat.leader .avatar-wrap::after {
     content: "⭐"; position: absolute; top: -10px; right: -10px;
     font-size: 22px; z-index: 7; filter: drop-shadow(0 0 8px gold);
     animation: starPop 0.4s ease-out;
 }
 @keyframes starPop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-
-/* CROWN — bid winner */
 .seat.bid-winner .avatar-wrap::before {
     content: "👑"; position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
     font-size: 22px; z-index: 6; filter: drop-shadow(0 0 8px gold);
@@ -337,7 +334,6 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
    ====================================================== */
 #my-area { position: relative; z-index: 5; padding: 0 6px; display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; }
 
-/* TEAMMATE CARDS — FLOATING */
 #teammate-cards {
     position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
     margin-bottom: 6px; padding: 8px 14px;
@@ -363,7 +359,6 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #teammate-cards-list .card .c-rank { font-size: 11px; }
 #teammate-cards-list .card .c-suit { font-size: 13px; }
 
-/* MY PROFILE ROW — FLOATING */
 #my-avatar-row {
     position: absolute; bottom: 100%; right: 12px; margin-bottom: 4px;
     display: flex; align-items: center; justify-content: flex-end; gap: 8px; z-index: 15;
@@ -396,7 +391,6 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     box-shadow: 0 2px 6px rgba(255,217,102,0.4);
 }
 
-/* MY HAND */
 #player1-cards {
     display: flex; gap: 2px; justify-content: center; align-items: flex-end;
     padding: 10px 8px 12px; min-height: 110px; margin-top: 8px;
@@ -458,7 +452,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 }
 
 /* ======================================================
-   MODALS — NO BLUR (cards stay clear)
+   MODALS
    ====================================================== */
 .modal-overlay {
     position: fixed; inset: 0;
@@ -498,7 +492,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 }
 #trump-buttons button:hover { transform: scale(1.1); box-shadow: 0 0 24px rgba(255,217,102,0.6); }
 
-/* ✅ Trump modal — upar shift karo taki cards dikhein */
+/* Trump modal — upar shift karo taki cards dikhein */
 #trump-modal .modal-box {
     margin-bottom: 30vh;
     max-width: 320px;
