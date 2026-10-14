@@ -72,12 +72,14 @@ function sortHand(hand) {
         return RANK_VALUE[a.rank] - RANK_VALUE[b.rank];
     });
 }
+
+// ✅ FIXED: Adds exactly cardsPerPlayer cards to existing hand
 function dealRoundRobin(room, deck, cardsPerPlayer) {
     let idx = 0;
     for (let c = 0; c < cardsPerPlayer; c++) {
         for (let i = 0; i < 4; i++) {
             const p = RIGHT_HAND_DEAL_ORDER[i];
-            if (room.players[p].hand.length < cardsPerPlayer) {
+            if (idx < deck.length) {
                 room.players[p].hand.push(deck[idx++]);
             }
         }
@@ -113,17 +115,25 @@ function dealWarmup(room) {
     const deck = shuffle(createDeck());
     room.phase = PHASE_WARMUP;
     room.players.forEach(p => { p.hand = []; p.tricks = 0; });
-    dealRoundRobin(room, deck, WARMUP_CARDS);
+    dealRoundRobin(room, deck, WARMUP_CARDS);   // 5 cards each
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     resetRoundState(room, WARMUP_BID - 1);
 }
 
+// ✅ KEY FIX: Warmup ke 5 cards same rakho, 8 naye add karo = 13
 function dealMainFromWarmup(room) {
     clearTurnTimer(room.id); clearBidTimer(room.id);
+    
+    // Warmup ke cards track karo (unhe re-deal nahi karna)
     const usedCards = new Set();
     room.players.forEach(p => p.hand.forEach(c => usedCards.add(c.rank + c.suit)));
+    
+    // Baaki 32 cards me se shuffle karo
     const availableDeck = shuffle(createDeck()).filter(c => !usedCards.has(c.rank + c.suit));
+    
+    // ✅ Existing 5 cards me 8 more add karo (5+8=13)
     dealRoundRobin(room, availableDeck, 8);
+    
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     room.phase = PHASE_MAIN;
     resetRoundState(room, MAIN_START_BID);
@@ -134,7 +144,7 @@ function dealMainFresh(room) {
     const deck = shuffle(createDeck());
     room.phase = PHASE_MAIN;
     room.players.forEach(p => { p.hand = []; p.tricks = 0; });
-    dealRoundRobin(room, deck, 13);
+    dealRoundRobin(room, deck, 13);   // 13 cards each
     room.players.forEach(p => { p.hand = sortHand(p.hand); });
     resetRoundState(room, MAIN_START_BID);
 }
@@ -198,7 +208,21 @@ function nextBidTurn(room) {
     }
 }
 
+// ✅ FIXED: Handles warmup all-pass case
 function finishBidding(room) {
+    // ✅ WARMUP ALL PASSED — direct main round
+    if (room.phase === PHASE_WARMUP && room.warmupAllPassed) {
+        console.log('🎯 Warmup all passed — dealing main round (5 + 8 = 13 cards)');
+        io.to(room.id).emit("warmupSkipped", {});
+        setTimeout(() => {
+            dealMainFromWarmup(room);
+            sendGameStart(room);
+            sendBidUpdate(room);
+            setTimeout(() => nextBidTurn(room), 500);
+        }, 1500);
+        return;
+    }
+    
     if (room.highestBidder === null || room.highestBidder === undefined) {
         const forced = RIGHT_HAND_ORDER[0];
         room.highestBidder = forced;
@@ -532,7 +556,6 @@ function finishWarmup(room) {
     TEAMS[bidderTeam].forEach(num => tricksWon += room.players[num - 1].tricks);
     const success = tricksWon >= WARMUP_BID;
     
-    // Net score logic
     if (success) {
         if (bidderTeam === "A") room.netScore += WARMUP_PENALTY;
         else room.netScore -= WARMUP_PENALTY;
@@ -888,17 +911,8 @@ io.on("connection", socket => {
         const res = handlePass(room, socket.data.playerId);
         if (res.error) return socket.emit("errorMsg", res.error);
         sendBidUpdate(room);
-        if (!room.biddingActive) {
-            if (room.phase === PHASE_WARMUP && room.warmupAllPassed) {
-                io.to(room.id).emit("warmupSkipped", {});
-                setTimeout(() => {
-                    dealMainFromWarmup(room);
-                    sendGameStart(room);
-                    sendBidUpdate(room);
-                    setTimeout(() => nextBidTurn(room), 500);
-                }, 1500);
-            } else finishBidding(room);
-        } else setTimeout(() => nextBidTurn(room), 400);
+        if (!room.biddingActive) finishBidding(room);
+        else setTimeout(() => nextBidTurn(room), 400);
     });
 
     socket.on("chooseTrump", ({ suit }) => {
