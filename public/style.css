@@ -35,7 +35,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .game-logo { text-align: center; padding: 8px 0 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .logo-crown { font-size: 28px; filter: drop-shadow(0 0 10px rgba(255,217,102,0.8)); animation: crownFloat 2.5s ease-in-out infinite; margin-bottom: -8px; }
 @keyframes crownFloat { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-6px) rotate(8deg); } }
-.filter-icon-big { font-size: 68px; filter: drop-shadow(0 0 20px rgba(255,217,102,0.6)) drop-shadow(0 8px 16px rgba(0,0,0,0.5)); animation: bounceLogo 3s ease-in-out infinite; }
+.logo-icon-big { font-size: 68px; display: inline-block; filter: drop-shadow(0 0 20px rgba(255,217,102,0.6)) drop-shadow(0 8px 16px rgba(0,0,0,0.5)); animation: bounceLogo 3s ease-in-out infinite; }
 @keyframes bounceLogo { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-12px) rotate(5deg); } }
 .game-title { margin: 0; font-size: 34px; font-weight: 900; letter-spacing: 2px; line-height: 1.1;
     background: linear-gradient(180deg, #ffe9a8 0%, #ffd966 40%, #d4a850 60%, #b88832 100%);
@@ -108,7 +108,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .lobby-footer { text-align: center; margin: 8px 0 0 0; font-size: 11px; font-weight: 700; color: rgba(255,217,102,0.5); letter-spacing: 1px; }
 
 /* ======================================================
-   PREMIUM GAME SCREEN
+   GAME SCREEN
    ====================================================== */
 #game {
     width: 100vw; height: 100vh; height: 100dvh; overflow: hidden;
@@ -125,12 +125,13 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     content: ''; position: absolute; inset: 0;
     background-image: radial-gradient(circle, rgba(255,217,102,0.08) 1px, transparent 1px), radial-gradient(circle, rgba(255,217,102,0.05) 2px, transparent 2px);
     background-size: 50px 50px, 100px 100px;
-    animation: lobbyParticles 25s linear infinite;
-    pointer-events: none;
+    animation: lobbyParticles 25s linear infinite; pointer-events: none;
     z-index: 0;
 }
 
-/* TOP BAR */
+/* ======================================================
+   TOP BAR
+   ====================================================== */
 #top-bar { display: flex; align-items: flex-start; gap: 6px; z-index: 10; padding: 0 2px; flex-shrink: 0; position: relative; }
 .round-badge {
     display: flex; align-items: center; gap: 8px;
@@ -195,7 +196,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 
-/* TABLE */
+/* ======================================================
+   TABLE
+   ====================================================== */
 #table {
     position: relative; flex: 0.6; min-height: 200px;
     display: grid; grid-template-columns: 1fr 1.2fr 1fr; grid-template-rows: 1fr 1fr 1fr;
@@ -207,7 +210,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .seat-left { grid-area: left; align-items: flex-start; justify-content: center; }
 .seat-right { grid-area: right; align-items: flex-end; justify-content: center; }
 
-/* PLAYED CARDS — FLOATING */
+/* ======================================================
+   PLAYED CARDS — FLOATING
+   ====================================================== */
 #played-cards-center {
     position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
     width: 200px; height: 200px; z-index: 8; pointer-events: none;
@@ -217,12 +222,13 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .pc-bottom { transform: translate(-50%,-50%) translate(22px,38px); }
 .pc-left { transform: translate(-50%,-50%) translate(-40px,10px); }
 .pc-right { transform: translate(-50%,-50%) translate(40px,-10px); }
-.pc-slot .card { width: 46px !important; height: 66px !important; animation: cardPop 0.25s ease-out; box-shadow: 0 6px 14px rgba(0,0,0,0.5); }
+.pc-slot .card { width: 46px !important; height: 66px !important; }
 .pc-slot .card .c-rank { font-size: 17px; }
 .pc-slot .card .c-suit { font-size: 19px; }
-@keyframes cardPop { 0% { transform: scale(0.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-/* PLAYERS */
+/* ======================================================
+   PLAYERS
+   ====================================================== */
 .player-badge {
     display: flex; align-items: center; gap: 5px;
     background: rgba(0,0,0,0.55);
@@ -275,7 +281,7 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     50% { box-shadow: 0 0 0 5px #ff5555, 0 0 32px 8px rgba(255,51,51,1); }
 }
 
-/* STAR */
+/* STAR — lead player */
 .seat.leader .avatar-wrap::after {
     content: "⭐"; position: absolute; top: -10px; right: -10px;
     font-size: 22px; z-index: 7; filter: drop-shadow(0 0 8px gold);
@@ -283,14 +289,16 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 }
 @keyframes starPop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-/* CROWN */
+/* CROWN — bid winner */
 .seat.bid-winner .avatar-wrap::before {
     content: "👑"; position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
     font-size: 22px; z-index: 6; filter: drop-shadow(0 0 8px gold);
     animation: crownFloat 2s ease-in-out infinite;
 }
 
-/* BID BADGE */
+/* ======================================================
+   BID BADGE
+   ====================================================== */
 .bid-badge {
     position: absolute; top: -4px; left: -4px;
     min-width: 26px; height: 26px; padding: 0 6px;
@@ -306,7 +314,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 @keyframes bidBadgePop { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 70% { transform: scale(1.15) rotate(5deg); } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
 #my-avatar-row .bid-badge { top: auto; bottom: 8px; left: -8px; box-shadow: 0 4px 12px rgba(255,217,102,0.6); }
 
-/* CARDS */
+/* ======================================================
+   CARDS
+   ====================================================== */
 .card {
     width: 46px; height: 66px;
     background: linear-gradient(180deg, #ffffff 0%, #f5e6c8 100%);
@@ -322,14 +332,16 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .card .c-rank { font-size: 19px; font-weight: 900; line-height: 1; }
 .card .c-suit { font-size: 21px; line-height: 1; }
 
-/* MY AREA */
+/* ======================================================
+   MY AREA
+   ====================================================== */
 #my-area { position: relative; z-index: 5; padding: 0 6px; display: flex; flex-direction: column; gap: 2px; margin-top: auto; padding-top: 8px; }
 
 /* TEAMMATE CARDS — FLOATING */
 #teammate-cards {
     position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
     margin-bottom: 6px; padding: 8px 14px;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0,0,0,0.75);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border: 1.5px solid rgba(255,217,102,0.5);
     border-radius: 16px; max-width: 380px; width: fit-content;
@@ -406,11 +418,13 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 #player1-cards .card .c-rank { font-size: 20px; }
 #player1-cards .card .c-suit { font-size: 22px; }
 
-/* BID UI */
+/* ======================================================
+   BID UI
+   ====================================================== */
 #bid-ui {
     position: fixed; top: calc(70px + env(safe-area-inset-top, 0)); left: 50%; transform: translateX(-50%);
     display: none; flex-direction: column; align-items: center; gap: 6px; z-index: 999;
-    background: rgba(0,0,0,0.8);
+    background: rgba(0,0,0,0.85);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     padding: 14px 18px; border-radius: 20px;
     border: 2px solid rgba(255,217,102,0.5);
@@ -443,11 +457,12 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     box-shadow: 0 6px 14px rgba(139,37,56,0.5) !important;
 }
 
-/* MODALS */
+/* ======================================================
+   MODALS — NO BLUR (cards stay clear)
+   ====================================================== */
 .modal-overlay {
     position: fixed; inset: 0;
-    background: rgba(0,0,0,0.75);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    background: rgba(0,0,0,0.85);
     display: flex; align-items: center; justify-content: center;
     z-index: 2000; padding: 20px;
 }
@@ -482,6 +497,14 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     transition: transform 0.2s;
 }
 #trump-buttons button:hover { transform: scale(1.1); box-shadow: 0 0 24px rgba(255,217,102,0.6); }
+
+/* ✅ Trump modal — upar shift karo taki cards dikhein */
+#trump-modal .modal-box {
+    margin-bottom: 30vh;
+    max-width: 320px;
+    padding: 18px 20px;
+}
+
 .result-box .trophy { font-size: 60px; animation: bounce 1.5s infinite; filter: drop-shadow(0 0 20px gold); }
 @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 .result-box h1 {
@@ -510,7 +533,9 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
 .team-label { font-size: 15px; font-weight: 800; }
 .team-score { font-size: 22px; font-weight: 900; color: #ffd966; }
 
-/* HISTORY */
+/* ======================================================
+   HISTORY
+   ====================================================== */
 #history-panel {
     position: fixed; left: 0; right: 0; bottom: 0;
     max-height: 75vh;
@@ -558,9 +583,45 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     backdrop-filter: blur(10px);
 }
 
-/* MOBILE */
+/* ======================================================
+   CARD THROW ANIMATION
+   ====================================================== */
+.flying-card {
+    position: fixed !important;
+    will-change: transform;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 217, 102, 0.4);
+    border: 2px solid #ffd966 !important;
+    transform-origin: center center;
+    backface-visibility: hidden;
+    z-index: 9999 !important;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #ffffff 0%, #f5e6c8 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #000; font-weight: bold; line-height: 1;
+    padding: 2px;
+}
+.flying-card.red { color: #d00; }
+.flying-card.black { color: #111; }
+.flying-card .c-rank { font-size: 19px; font-weight: 900; line-height: 1; }
+.flying-card .c-suit { font-size: 21px; line-height: 1; }
+
+.pc-slot .card {
+    animation: cardLand 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3), 0 0 12px rgba(255, 217, 102, 0.3);
+}
+@keyframes cardLand {
+    0% { transform: scale(0.7) rotate(5deg); }
+    60% { transform: scale(1.08) rotate(-3deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
+/* ======================================================
+   MOBILE PORTRAIT
+   ====================================================== */
 @media (max-width: 400px) {
     .card { width: 42px; height: 60px; }
+    .card .c-rank { font-size: 17px; }
+    .card .c-suit { font-size: 19px; }
     .pc-slot .card { width: 38px !important; height: 54px !important; }
     #played-cards-center { width: 170px; height: 170px; }
     .pc-top { transform: translate(-50%,-50%) translate(-18px,-32px); }
@@ -571,13 +632,18 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     .player-avatar, .avatar-wrap { width: 54px; height: 54px; }
     .player-avatar { font-size: 28px; }
     .my-avatar-inner, .my-avatar-wrap { width: 50px; height: 50px; }
+    .my-avatar-inner { font-size: 26px; }
     .icon-btn { width: 38px; height: 38px; }
     #table { min-height: 170px; }
     #teammate-cards { max-width: 320px; padding: 6px 10px; }
     #teammate-cards-list .card { width: 24px; height: 34px; margin-left: -4px; }
     .game-title { font-size: 28px; }
+    #trump-modal .modal-box { margin-bottom: 25vh; }
 }
 
+/* ======================================================
+   MOBILE LANDSCAPE
+   ====================================================== */
 @media screen and (orientation: landscape) and (max-height: 550px) {
     .card { width: 36px; height: 52px; }
     .card .c-rank { font-size: 15px; }
@@ -590,6 +656,8 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     .pc-right { transform: translate(-50%,-50%) translate(28px,-6px); }
     #player1-cards { min-height: 70px; padding: 6px 6px 8px; }
     #player1-cards .card { width: 40px; height: 56px; margin-left: -8px; }
+    #player1-cards .card .c-rank { font-size: 16px; }
+    #player1-cards .card .c-suit { font-size: 18px; }
     .player-avatar, .avatar-wrap { width: 48px; height: 48px; }
     .player-avatar { font-size: 24px; }
     .my-avatar-inner, .my-avatar-wrap { width: 44px; height: 44px; }
@@ -602,4 +670,6 @@ button { font-family: inherit; cursor: pointer; border: none; outline: none; }
     #bid-ui button { padding: 6px 8px; font-size: 12px; min-width: 34px; min-height: 32px; }
     #my-area { padding-top: 4px; }
     .game-title { font-size: 26px; }
+    #trump-modal .modal-box { margin-bottom: 20vh; max-width: 280px; padding: 14px 16px; }
+    #trump-buttons button { width: 52px; height: 52px; font-size: 26px; }
 }

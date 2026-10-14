@@ -7,9 +7,9 @@ const S = {
     leadPlayerId: null, currentBid: 7, highestBid: 7, highestBidderId: null,
     biddingActive: false, nextBidderId: null,
     handSizes: {}, tricks: {}, revealedHand: null, revealedOwnerId: null,
-    bidWinnerId: null, teamAScore: 0, teamBScore: 0, totalTricks: 5,
+    bidWinnerId: null, teamAScore: 0, teamBScore: 0, netScore: 0, totalTricks: 5,
     playerNames: {}, playerTeams: {}, bidHistory: [], playerBids: {},
-    isPlayingCard: false, cardJustPlayed: false, lastResolvedTrick: -1,
+    isPlayingCard: false, lastResolvedTrick: -1,
     seatMap: {}, pcMap: {}
 };
 
@@ -63,8 +63,8 @@ function showLobbyMsg(msg) {
 /* ============ SOCKET ============ */
 socket.on('joined', data => {
     S.myId = data.playerId; S.roomId = data.roomId; S.isSpectator = !!data.isSpectator;
-    const lobbyEl = $('lobby'); if (lobbyEl) lobbyEl.classList.add('hidden');
-    const gameEl = $('game'); if (gameEl) gameEl.classList.remove('hidden');
+    const l = $('lobby'); if (l) l.classList.add('hidden');
+    const g = $('game'); if (g) g.classList.remove('hidden');
     buildMaps();
     if (S.isSpectator) {
         const sb = $('spectator-banner'); if (sb) sb.classList.remove('hidden');
@@ -86,28 +86,26 @@ socket.on('roomUpdate', data => {
 socket.on('gameStart', data => {
     S.myId = data.yourId; S.myHand = data.yourHand || [];
     S.phase = data.phase; S.currentBid = data.currentBid;
-    S.teamAScore = data.teamAScore; S.teamBScore = data.teamBScore;
+    S.teamAScore = data.teamAScore || 0; S.teamBScore = data.teamBScore || 0;
+    S.netScore = data.netScore || 0;
     S.totalTricks = data.phase === 'warmup' ? 5 : 13;
     S.revealedHand = null; S.revealedOwnerId = null;
     S.bidWinnerId = null; S.trumpSuit = null;
     S.playerBids = {}; S.leadPlayerId = null;
-    S.isPlayingCard = false; S.cardJustPlayed = false; S.lastResolvedTrick = -1;
+    S.isPlayingCard = false; S.lastResolvedTrick = -1;
     buildMaps();
     data.players.forEach(p => {
         S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
         S.handSizes[p.id] = p.handSize; S.tricks[p.id] = p.tricks;
     });
     S.bidHistory = data.bidHistory || [];
-    renderBidHistory();
-    renderBidBadges();
+    renderBidHistory(); renderBidBadges();
     const tc = $('teammate-cards'); if (tc) tc.classList.add('hidden');
     document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
     document.querySelectorAll('.seat').forEach(s => s.classList.remove('active', 'bid-winner', 'leader'));
     renderGame();
     renderAllSeats();
-    if (data.currentBidderId && data.currentBidderId !== S.myId) {
-        renderBidTurnGlow(data.currentBidderId);
-    }
+    if (data.currentBidderId && data.currentBidderId !== S.myId) renderBidTurnGlow(data.currentBidderId);
     if (data.currentBidderId === S.myId) renderBidUI();
 });
 
@@ -117,13 +115,9 @@ socket.on('bidUpdate', data => {
     S.biddingActive = data.biddingActive; S.nextBidderId = data.nextBidderId;
     S.phase = data.phase; S.bidHistory = data.bidHistory || [];
     parseBidHistory(S.bidHistory);
-    renderBidHistory();
-    renderBidBadges();
-    if (data.biddingActive && data.nextBidderId) {
-        renderBidTurnGlow(data.nextBidderId);
-    } else {
-        document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
-    }
+    renderBidHistory(); renderBidBadges();
+    if (data.biddingActive && data.nextBidderId) renderBidTurnGlow(data.nextBidderId);
+    else document.querySelectorAll('.seat').forEach(s => s.classList.remove('active'));
     if (data.biddingActive && data.nextBidderId === S.myId && !S.isSpectator) renderBidUI();
     else { const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); }
 });
@@ -149,7 +143,7 @@ socket.on('trumpSet', data => {
     }
 });
 
-socket.on('teammateRevealed', data => {});
+socket.on('teammateRevealed', () => {});
 
 socket.on('roundStarted', data => {
     S.myHand = data.yourHand || [];
@@ -159,46 +153,44 @@ socket.on('roundStarted', data => {
     S.revealedHand = data.revealedHand;
     S.revealedOwnerId = data.revealedOwnerId;
     S.bidWinnerId = data.bidWinnerId;
-    S.phase = data.phase;
-    S.totalTricks = data.totalTricks;
-    S.isPlayingCard = false; S.cardJustPlayed = false; S.lastResolvedTrick = -1;
+    S.phase = data.phase; S.totalTricks = data.totalTricks;
+    S.isPlayingCard = false; S.lastResolvedTrick = -1;
     document.querySelectorAll('.pc-slot').forEach(s => s.innerHTML = '');
     data.handSizes.forEach(h => { S.handSizes[h.id] = h.size; S.tricks[h.id] = h.tricks; });
     if (S.revealedHand && S.revealedHand.length > 0) {
         const tc = $('teammate-cards'); if (tc) tc.classList.remove('hidden');
         renderTeammateHand();
     }
-    updateTrumpIndicator();
-    renderGame();
-    renderCrown();
-    renderLeaderStar();
-    renderBidBadges();
+    updateTrumpIndicator(); renderGame(); renderCrown(); renderLeaderStar(); renderBidBadges();
 });
 
 socket.on('cardPlayed', data => {
-    const slot = findPcSlotForPlayer(data.playerId);
-    if (slot) {
-        const slotEl = $(slot);
-        if (slotEl) { slotEl.innerHTML = ''; slotEl.appendChild(makeCardEl(data.card)); }
-    }
+    throwCardAnimation(data.playerId, data.card, () => {
+        const slot = findPcSlotForPlayer(data.playerId);
+        if (slot) {
+            const slotEl = $(slot);
+            if (slotEl) {
+                slotEl.innerHTML = '';
+                slotEl.appendChild(makeCardEl(data.card));
+            }
+        }
+    });
     if (data.playerId === S.myId) S.isPlayingCard = false;
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
-    renderTurnIndicator();
-    renderLeaderStar();
-    highlightPlayable();
+    renderTurnIndicator(); renderLeaderStar(); highlightPlayable();
+    if (data.wasAutoPlayed) showToast(`⏰ ${data.playerName} auto-played`, 1200);
 });
 
 socket.on('handUpdate', data => {
     S.myHand = data.hand || [];
-    renderMyHand();
-    highlightPlayable();
+    S.isPlayingCard = false;
+    renderMyHand(); highlightPlayable();
 });
 
 socket.on('trickResolved', data => {
     data.players.forEach(p => { S.tricks[p.id] = p.tricks; S.handSizes[p.id] = p.handSize; });
     renderScores();
-    S.cardJustPlayed = false;
     S.isPlayingCard = false;
     if (data.bidBroken) showToast('💥 Bid Broken!', 1500);
     const thisTrick = data.trickNumber;
@@ -210,8 +202,7 @@ socket.on('trickResolved', data => {
     }, 800);
     S.currentPlayerId = data.nextPlayerId;
     if (data.leadPlayerId) S.leadPlayerId = data.leadPlayerId;
-    renderTurnIndicator();
-    renderLeaderStar();
+    renderTurnIndicator(); renderLeaderStar();
 });
 
 socket.on('revealedHandUpdate', data => {
@@ -223,18 +214,32 @@ socket.on('revealedHandUpdate', data => {
     }
 });
 
-socket.on('roundEnd', data => showRoundEnd(data));
-socket.on('gameOver', data => showGameOver(data));
+socket.on('roundEnd', data => {
+    if (data.netScore !== undefined) S.netScore = data.netScore;
+    if (data.teamAScore !== undefined) S.teamAScore = data.teamAScore;
+    if (data.teamBScore !== undefined) S.teamBScore = data.teamBScore;
+    renderScores();
+    showRoundEnd(data);
+});
+
+socket.on('gameOver', data => {
+    if (data.netScore !== undefined) S.netScore = data.netScore;
+    showGameOver(data);
+});
+
 socket.on('gameRestarted', () => {
     const go = $('game-over-modal'); if (go) go.classList.add('hidden');
     const re = $('round-end-modal'); if (re) re.classList.add('hidden');
 });
+
 socket.on('restartVotesUpdate', data => { const el = $('vote-badge'); if (el) el.textContent = data.total; });
-socket.on('errorMsg', msg => console.warn('Server error:', msg));
+socket.on('errorMsg', msg => { console.warn('Server error:', msg); S.isPlayingCard = false; });
 socket.on('playerLeft', data => console.log(data.playerName + ' left'));
+
 socket.on('spectatorJoined', data => {
     if (!data.room) return;
-    S.teamAScore = data.room.teamAScore; S.teamBScore = data.room.teamBScore; S.phase = data.room.phase;
+    S.teamAScore = data.room.teamAScore; S.teamBScore = data.room.teamBScore;
+    S.phase = data.room.phase;
     data.room.players.forEach(p => {
         S.playerNames[p.id] = p.name; S.playerTeams[p.id] = p.team;
         S.handSizes[p.id] = p.handSize; S.tricks[p.id] = p.tricks;
@@ -242,20 +247,72 @@ socket.on('spectatorJoined', data => {
     renderGame();
 });
 
+/* ============ CARD THROW ANIMATION ============ */
+function throwCardAnimation(playerId, card, callback) {
+    let seatSelector = null;
+    if (playerId === S.myId) seatSelector = '#my-avatar-row .my-avatar-inner';
+    else {
+        const seatId = findSeatForPlayer(playerId);
+        if (seatId) seatSelector = '#' + seatId + ' .player-avatar';
+    }
+    const pcSlotId = findPcSlotForPlayer(playerId);
+    const slotEl = pcSlotId ? $(pcSlotId) : null;
+    const seatEl = seatSelector ? document.querySelector(seatSelector) : null;
+    if (!seatEl || !slotEl) { callback(); return; }
+
+    const startRect = seatEl.getBoundingClientRect();
+    const endRect = slotEl.getBoundingClientRect();
+
+    const flyCard = document.createElement('div');
+    const isRed = card.suit === '♥️' || card.suit === '♦️';
+    flyCard.className = 'card flying-card ' + (isRed ? 'red' : 'black');
+    flyCard.innerHTML = `<div class="c-rank">${card.rank}</div><div class="c-suit">${card.suit}</div>`;
+
+    const cardW = 46, cardH = 66;
+    const startX = startRect.left + startRect.width / 2 - cardW / 2;
+    const startY = startRect.top + startRect.height / 2 - cardH / 2;
+
+    flyCard.style.position = 'fixed';
+    flyCard.style.left = startX + 'px';
+    flyCard.style.top = startY + 'px';
+    flyCard.style.width = cardW + 'px';
+    flyCard.style.height = cardH + 'px';
+    flyCard.style.zIndex = '9999';
+    flyCard.style.pointerEvents = 'none';
+    flyCard.style.transformOrigin = 'center center';
+    flyCard.style.transform = 'scale(0.4) rotate(-25deg)';
+    flyCard.style.opacity = '0.85';
+    document.body.appendChild(flyCard);
+
+    const endX = endRect.left + endRect.width / 2 - cardW / 2;
+    const endY = endRect.top + endRect.height / 2 - cardH / 2;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const rotation = (Math.random() * 30 - 15) + 720;
+
+    try {
+        const snd = $('throw-sound');
+        if (snd) { snd.currentTime = 0; snd.volume = 0.3; snd.play().catch(() => {}); }
+    } catch (e) {}
+
+    requestAnimationFrame(() => {
+        flyCard.style.transition = 'transform 0.5s cubic-bezier(0.25, 0.6, 0.35, 1), opacity 0.5s ease-out';
+        flyCard.style.transform = `translate(${dx}px, ${dy}px) scale(1) rotate(${rotation}deg)`;
+        flyCard.style.opacity = '1';
+    });
+
+    setTimeout(() => { flyCard.remove(); callback(); }, 520);
+}
+
 /* ============ HELPERS ============ */
 function findPcSlotForPlayer(pid) {
     if (pid === S.myId) return 'pc-bottom';
-    for (const slot in S.pcMap) {
-        if (S.pcMap[slot] === pid) return slot;
-    }
+    for (const slot in S.pcMap) if (S.pcMap[slot] === pid) return slot;
     return null;
 }
-
 function findSeatForPlayer(pid) {
     if (pid === S.myId) return null;
-    for (const seat in S.seatMap) {
-        if (S.seatMap[seat] === pid) return seat;
-    }
+    for (const seat in S.seatMap) if (S.seatMap[seat] === pid) return seat;
     return null;
 }
 
@@ -309,8 +366,11 @@ function makeCardEl(card) {
 }
 
 function renderScores() {
-    const aEl = $('score-a'); if (aEl) aEl.textContent = S.teamAScore;
-    const bEl = $('score-b'); if (bEl) bEl.textContent = S.teamBScore;
+    const net = S.netScore || 0;
+    const aScore = Math.max(0, net);
+    const bScore = Math.max(0, -net);
+    const aEl = $('score-a'); if (aEl) aEl.textContent = aScore;
+    const bEl = $('score-b'); if (bEl) bEl.textContent = bScore;
     renderAllSeats();
     const myTrickEl = $('my-tricks'); if (myTrickEl) myTrickEl.textContent = S.tricks[S.myId] || 0;
     const trickEl = $('tricks-label'); if (trickEl) trickEl.textContent = `${S.tricks[S.myId] || 0}/${S.totalTricks}`;
@@ -353,28 +413,26 @@ function updateTrumpIndicator() {
     if (!el) return;
     if (!S.trumpSuit) {
         el.classList.add('empty');
-        const iconEl = $('trump-icon'); if (iconEl) iconEl.textContent = '?';
-        const nameEl = $('trump-name-small'); if (nameEl) nameEl.textContent = 'No Trump';
+        const i = $('trump-icon'); if (i) i.textContent = '?';
+        const n = $('trump-name-small'); if (n) n.textContent = 'No Trump';
     } else {
         el.classList.remove('empty');
-        const iconEl = $('trump-icon'); if (iconEl) iconEl.textContent = S.trumpSuit;
-        const nameEl = $('trump-name-small');
-        if (nameEl) nameEl.textContent = S.playerNames[S.highestBidderId] || 'Trump';
+        const i = $('trump-icon'); if (i) i.textContent = S.trumpSuit;
+        const n = $('trump-name-small');
+        if (n) n.textContent = S.playerNames[S.highestBidderId] || 'Trump';
     }
 }
 
 function renderBidUI() {
     let container = $('main-bid-buttons');
     if (!container) {
-        console.warn('⚠️ main-bid-buttons not found — creating...');
         const bidUI = $('bid-ui');
-        if (!bidUI) { console.error('❌ bid-ui missing'); return; }
+        if (!bidUI) return;
         container = document.createElement('div');
         container.id = 'main-bid-buttons';
         bidUI.appendChild(container);
     }
     container.innerHTML = '';
-
     const infoEl = $('bid-turn-info');
 
     if (S.phase === 'warmup') {
@@ -382,12 +440,10 @@ function renderBidUI() {
         bidBtn.textContent = 'Bid 5';
         bidBtn.onclick = () => { socket.emit('bid', { bid: 5 }); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
         container.appendChild(bidBtn);
-
         const passBtn = document.createElement('button');
         passBtn.textContent = 'PASS'; passBtn.className = 'pass-btn';
         passBtn.onclick = () => { socket.emit('pass'); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
         container.appendChild(passBtn);
-
         if (infoEl) infoEl.textContent = 'Warmup — Bid 5 or Pass';
     } else {
         const startBid = Math.max(8, S.currentBid + 1);
@@ -401,10 +457,8 @@ function renderBidUI() {
         passBtn.textContent = 'PASS'; passBtn.className = 'pass-btn';
         passBtn.onclick = () => { socket.emit('pass'); const bu = $('bid-ui'); if (bu) bu.classList.remove('active'); };
         container.appendChild(passBtn);
-
         if (infoEl) infoEl.textContent = `Bid above ${S.currentBid}`;
     }
-
     const bu = $('bid-ui'); if (bu) bu.classList.add('active');
 }
 
@@ -429,12 +483,9 @@ function parseBidHistory(history) {
     history.forEach(entry => {
         const parts = entry.split(' → ');
         if (parts.length < 2) return;
-        const name = parts[0].trim();
-        const val = parts[1].trim();
+        const name = parts[0].trim(); const val = parts[1].trim();
         let foundId = null;
-        for (const id in S.playerNames) {
-            if (S.playerNames[id] === name) { foundId = id; break; }
-        }
+        for (const id in S.playerNames) if (S.playerNames[id] === name) { foundId = id; break; }
         if (!foundId) return;
         if (val.startsWith('Bid')) S.playerBids[foundId] = val.replace('Bid', '').trim();
         else if (val.startsWith('PASS')) S.playerBids[foundId] = 'PASS';
@@ -484,19 +535,24 @@ function renderTeammateHand() {
     if (!S.revealedHand) return;
     S.revealedHand.forEach(card => { el.appendChild(makeCardEl(card)); });
     const owner = S.playerNames[S.revealedOwnerId] || 'Partner';
-    const titleEl = $('partner-title');
-    if (titleEl) titleEl.textContent = `👀 Partner — ${owner}`;
+    const t = $('partner-title');
+    if (t) t.textContent = `👀 Partner — ${owner}`;
 }
 
 /* ============ ACTIONS ============ */
 function onPlayCard(idx) {
     if (S.currentPlayerId !== S.myId) return;
     if (S.isPlayingCard) return;
-    if (S.cardJustPlayed) return;
     S.isPlayingCard = true;
-    S.cardJustPlayed = true;
+    const myCardEls = document.querySelectorAll('#player1-cards .card');
+    const clickedEl = myCardEls[idx];
+    if (clickedEl) {
+        clickedEl.style.transition = 'all 0.3s ease-out';
+        clickedEl.style.transform = 'scale(0.5) translateY(-30px)';
+        clickedEl.style.opacity = '0';
+    }
     socket.emit('playCard', { cardIndex: idx });
-    setTimeout(() => { S.isPlayingCard = false; }, 1000);
+    setTimeout(() => { S.isPlayingCard = false; }, 1500);
 }
 
 const trumpBtns = $('trump-buttons');
@@ -572,34 +628,36 @@ function showRoundEnd(data) {
         if (data.success) {
             if (trophy) trophy.textContent = '😅';
             if (title) title.textContent = 'Warmup Survived';
-            if (sub) sub.textContent = `${data.bidderTeam} bid 5 — opponents +26`;
+            if (sub) sub.textContent = `${data.bidderTeam} bid 5 — +26`;
         } else {
             if (trophy) trophy.textContent = '💥';
             if (title) title.textContent = 'Warmup Failed';
-            if (sub) sub.textContent = `${data.bidderTeam} bid 5 and failed — -26`;
+            if (sub) sub.textContent = `${data.bidderTeam} failed — -26`;
         }
     } else {
         if (data.bidBroken) {
             if (trophy) trophy.textContent = '💥';
             if (title) title.textContent = 'Bid Broken!';
-            if (sub) sub.textContent = `${data.team} bid ${data.bid} — opponents broke it (${data.sar})`;
+            if (sub) sub.textContent = `${data.team} bid ${data.bid} — opponents broke it`;
         } else if (data.sar >= 0) {
             if (trophy) trophy.textContent = '🎉';
             if (title) title.textContent = 'Bid Made!';
-            if (sub) sub.textContent = `${data.team} bid ${data.bid}, won ${data.tricks} tricks (+${data.sar})`;
+            if (sub) sub.textContent = `${data.team} bid ${data.bid}, won ${data.tricks} (+${data.sar})`;
         } else {
             if (trophy) trophy.textContent = '💥';
             if (title) title.textContent = 'Bid Failed!';
-            if (sub) sub.textContent = `${data.team} bid ${data.bid}, won only ${data.tricks} (${data.sar})`;
+            if (sub) sub.textContent = `${data.team} bid ${data.bid}, won ${data.tricks} (${data.sar})`;
         }
     }
     if (scores) {
+        const net = data.netScore || 0;
+        const aS = Math.max(0, net), bS = Math.max(0, -net);
         scores.innerHTML = `
-            <div class="score-row ${data.teamAScore > data.teamBScore ? 'winner' : ''}">
-                <span class="team-label">Team A</span><span class="team-score">${data.teamAScore}</span>
+            <div class="score-row ${aS > bS ? 'winner' : ''}">
+                <span class="team-label">Team A</span><span class="team-score">${aS}</span>
             </div>
-            <div class="score-row ${data.teamBScore > data.teamAScore ? 'winner' : ''}">
-                <span class="team-label">Team B</span><span class="team-score">${data.teamBScore}</span>
+            <div class="score-row ${bS > aS ? 'winner' : ''}">
+                <span class="team-label">Team B</span><span class="team-score">${bS}</span>
             </div>`;
     }
     modal.classList.remove('hidden');
@@ -613,12 +671,14 @@ function showGameOver(data) {
     if (titleEl) titleEl.textContent = `TEAM ${data.winner} WINS!`;
     if (subEl) subEl.textContent = 'Congratulations!';
     if (scoresEl) {
+        const net = data.netScore || 0;
+        const aS = Math.max(0, net), bS = Math.max(0, -net);
         scoresEl.innerHTML = `
             <div class="score-row ${data.winner === 'A' ? 'winner' : ''}">
-                <span class="team-label">Team A</span><span class="team-score">${data.teamAScore}</span>
+                <span class="team-label">Team A</span><span class="team-score">${aS}</span>
             </div>
             <div class="score-row ${data.winner === 'B' ? 'winner' : ''}">
-                <span class="team-label">Team B</span><span class="team-score">${data.teamBScore}</span>
+                <span class="team-label">Team B</span><span class="team-score">${bS}</span>
             </div>`;
     }
     const gm = $('game-over-modal'); if (gm) gm.classList.remove('hidden');
@@ -637,3 +697,11 @@ function showToast(msg, duration = 2000) {
     clearTimeout(toast._timer);
     toast._timer = setTimeout(() => { toast.style.display = 'none'; }, duration);
 }
+
+/* Watchdog */
+setInterval(() => {
+    if (S.isSpectator) return;
+    if (!S.currentPlayerId) return;
+    if (S.phase !== 'warmup' && S.phase !== 'main') return;
+    socket.emit('forceTurnCheck');
+}, 10000);
